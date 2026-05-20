@@ -14,7 +14,7 @@ body{font-family:'Calibri',system-ui,sans-serif;font-size:13px}
 .header h1{color:#fff;font-size:17px;font-weight:700}
 .header h1 span{color:var(--dou)}
 .header p{color:var(--dou);font-size:11px;font-style:italic;margin-top:3px}
-.header-user{color:var(--dou);font-size:11px;margin-top:6px;display:flex;align-items:center;gap:10px}
+.header-user{color:var(--dou);font-size:11px;margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tabs{display:flex;background:#fff;border-bottom:2px solid var(--vc)}
 .tab{padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;color:#666;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s}
 .tab.active{color:var(--ve);font-weight:700;border-bottom-color:var(--ve)}
@@ -50,14 +50,17 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
 .ins-subval{padding:6px 12px;text-align:right;font-size:12px;color:#888}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:8px}
 .badge-ok{background:#E8F5E9;color:#1B5E20}
-.badge-warn{background:#FFF8E1;color:#E65100}
 .badge-sp{background:#0078D4;color:#fff}
-
-/* Tela de login */
+.obra-bar{background:var(--vf);border-bottom:2px solid var(--gc);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.obra-bar label{font-weight:700;color:var(--ve);font-size:12px;white-space:nowrap}
+.obra-bar select{width:auto;min-width:220px;font-weight:700;color:var(--ve);border-color:var(--vc)}
+.obra-badge{background:var(--ve);color:var(--dou);padding:3px 12px;border-radius:10px;font-size:11px;font-weight:700}
 #login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;padding:40px}
 #login-screen h2{color:var(--ve);margin-bottom:8px;font-size:18px}
 #login-screen p{color:#666;font-size:13px;margin-bottom:24px;text-align:center}
 #app-screen{display:none}
+.obra-section{background:var(--vf);border:1px solid var(--vc);border-radius:6px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.obra-section span{font-weight:700;color:var(--ve);font-size:13px}
 </style>
 </head>
 <body>
@@ -72,9 +75,7 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
     <div style="font-size:36px;margin-bottom:16px">🔐</div>
     <h2>Acesso Corporativo</h2>
     <p>Entre com sua conta Microsoft<br>(@grupobrinfra.com) para continuar</p>
-    <button class="btn btn-dark" id="btn-login" onclick="doLogin()" style="width:100%;padding:12px;font-size:14px">
-      &gt;&gt; Entrar com Microsoft 365
-    </button>
+    <button class="btn btn-dark" id="btn-login" onclick="doLogin()" style="width:100%;padding:12px;font-size:14px">&gt;&gt; Entrar com Microsoft 365</button>
     <div id="login-msg" style="margin-top:14px;font-size:12px;color:#888"></div>
   </div>
 </div>
@@ -90,6 +91,16 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
       <button onclick="doLogout()" style="background:none;border:1px solid var(--dou);color:var(--dou);padding:2px 10px;border-radius:10px;font-size:10px;cursor:pointer;font-weight:700">Sair</button>
     </div>
   </div>
+
+  <!-- SELETOR DE OBRA GLOBAL -->
+  <div class="obra-bar">
+    <label>🏗️ Obra Ativa:</label>
+    <select id="obra-global" onchange="obraChanged()">
+      <option value="">— Selecione a obra —</option>
+    </select>
+    <span id="obra-badge" class="obra-badge" style="display:none"></span>
+  </div>
+
   <div class="tabs">
     <button class="tab active" onclick="showTab('painel')">Painel</button>
     <button class="tab" onclick="showTab('gravar')">Gravar Revisão</button>
@@ -97,9 +108,31 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
     <button class="tab" onclick="showTab('insights')">Insights</button>
   </div>
   <div id="msg-area"></div>
-  <div id="painel" class="panel active"><div class="bar"></div><div id="painel-content"><div class="empty">Carregando...</div></div></div>
+
+  <!-- PAINEL -->
+  <div id="painel" class="panel active"><div class="bar"></div><div id="painel-content"><div class="empty">Selecione uma obra acima para ver as revisões.</div></div></div>
+
+  <!-- GRAVAR REVISÃO -->
   <div id="gravar" class="panel"><div class="bar"></div>
-    <div class="card" style="max-width:540px">
+    <div class="card" style="max-width:580px">
+      <div style="margin-bottom:14px">
+        <label class="lbl">Obra</label>
+        <select id="obra-input" onchange="obraInputChanged()">
+          <option value="">— Selecione a obra —</option>
+          <option value="2024.01 - SE CMS E UTEC">2024.01 - SE CMS E UTEC</option>
+          <option value="2025.01 - SE RVD">2025.01 - SE RVD</option>
+          <option value="2025.02 - SE PBU">2025.02 - SE PBU</option>
+          <option value="2025.03 - SE RVD 19R">2025.03 - SE RVD 19R</option>
+          <option value="2025.04 - SE BTO 9R">2025.04 - SE BTO 9R</option>
+          <option value="2025.05 - SE BTO 10R">2025.05 - SE BTO 10R</option>
+          <option value="2025.06 - SE MRI 5R">2025.06 - SE MRI 5R</option>
+          <option value="2026.01 - SE CGD">2026.01 - SE CGD</option>
+          <option value="2026.02 - SE TFD">2026.02 - SE TFD</option>
+          <option value="2026.03 - SE VIT">2026.03 - SE VIT</option>
+          <option value="__nova__">+ Nova obra (digitar)</option>
+        </select>
+        <input type="text" id="obra-nova" placeholder="Digite o nome da nova obra" style="display:none;margin-top:8px">
+      </div>
       <div style="margin-bottom:14px"><label class="lbl">Arquivo Budget (.xlsx / .xlsm)</label><input type="file" id="file-input" accept=".xlsx,.xlsm" onchange="handleFile(this)"></div>
       <div style="margin-bottom:14px"><label class="lbl">Mês de Fechamento</label><input type="text" id="mes-input" placeholder="ex: ABR/2026" style="width:180px"><span style="font-size:11px;color:#888;margin-left:8px">MMM/AAAA</span></div>
       <div style="margin-bottom:16px"><label class="lbl">Observação (opcional)</label><input type="text" id="obs-input" placeholder="ex: fechamento abril realizado"></div>
@@ -108,8 +141,13 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
       <div id="storage-status" style="margin-top:10px;font-size:11px;color:#888"></div>
     </div>
   </div>
+
+  <!-- COMPARATIVO -->
   <div id="comp" class="panel"><div class="bar"></div>
     <div class="card">
+      <div id="comp-obra-info" class="obra-section" style="display:none">
+        <span>🏗️ Obra: </span><span id="comp-obra-nome" style="color:var(--vc)"></span>
+      </div>
       <div class="selrow">
         <div><label>Revisão Base</label><select id="sel-base"><option value="">Selecione...</option></select></div>
         <div><label>Revisão Atual</label><select id="sel-atual"><option value="">Selecione...</option></select></div>
@@ -119,18 +157,18 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
       </div>
       <div id="comp-info" style="font-size:11px;color:#888;margin-bottom:8px"></div>
     </div>
-    <div id="comp-table"><div class="empty">Configure as revisões e clique em Gerar.</div></div>
+    <div id="comp-table"><div class="empty">Selecione uma obra e configure as revisões para gerar o comparativo.</div></div>
   </div>
-  <div id="insights" class="panel"><div class="bar"></div><div id="insights-content"><div class="empty">Nenhuma revisão gravada ainda.</div></div></div>
+
+  <!-- INSIGHTS -->
+  <div id="insights" class="panel"><div class="bar"></div><div id="insights-content"><div class="empty">Selecione uma obra para ver os insights.</div></div></div>
+
   <div style="background:var(--ve);color:var(--dou);font-size:10px;text-align:center;padding:8px;margin-top:8px">
     BR Infra Sistemas e Construções Ltda. &nbsp;|&nbsp; CNPJ 09.243.456/0001-57 &nbsp;|&nbsp; grupobrinfra.com
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-// CONFIGURAÇÕES — NÃO ALTERAR
-// ═══════════════════════════════════════════════════════════════
 var CONFIG = {
   clientId:   '328bd446-9db0-4851-8765-c65d142b5cd8',
   tenantId:   'ad63ab66-ec91-4035-8ba2-31a176cb2b49',
@@ -139,55 +177,36 @@ var CONFIG = {
   scopes:     ['https://graph.microsoft.com/Sites.ReadWrite.All']
 };
 
-// ═══════════════════════════════════════════════════════════════
-// MSAL — Autenticação Microsoft
-// ═══════════════════════════════════════════════════════════════
-var msalApp = null;
-var currentAccount = null;
-var SITE_ID = null;
-var LIST_ID = null;
+var OBRAS_FIXAS = [
+  '2024.01 - SE CMS E UTEC','2025.01 - SE RVD','2025.02 - SE PBU',
+  '2025.03 - SE RVD 19R','2025.04 - SE BTO 9R','2025.05 - SE BTO 10R',
+  '2025.06 - SE MRI 5R','2026.01 - SE CGD','2026.02 - SE TFD','2026.03 - SE VIT'
+];
+
+// ═══ MSAL ═══
+var msalApp = null, currentAccount = null, SITE_ID = null, LIST_ID = null;
 
 async function initMsal() {
-  // Compatível com MSAL v2 e v3
-  var MsalApp = (window.msal && window.msal.PublicClientApplication)
-    ? window.msal.PublicClientApplication
-    : null;
-
-  if (!MsalApp) {
-    document.getElementById('login-msg').textContent = 'Erro: biblioteca de autenticação não carregou. Verifique sua conexão com a internet.';
-    return;
-  }
-
-  msalApp = new MsalApp({
+  msalApp = new (window.msal && window.msal.PublicClientApplication ? window.msal.PublicClientApplication : msal.PublicClientApplication)({
     auth: {
       clientId: CONFIG.clientId,
       authority: 'https://login.microsoftonline.com/' + CONFIG.tenantId,
-      redirectUri: 'https://marcosgarcao.github.io/budget-brinfra/controle_revisoes_v4_sharepoint.html'
+      redirectUri: 'https://marcosgarcao.github.io/budget-brinfra/controle_revisoes_v5_obras.html'
     },
     cache: { cacheLocation: 'sessionStorage' }
   });
-
-  if (typeof msalApp.initialize === 'function') {
-    await msalApp.initialize();
-  }
-
-  // Verifica se já há sessão ativa
+  if (typeof msalApp.initialize === 'function') await msalApp.initialize();
   var accounts = msalApp.getAllAccounts();
-  if (accounts.length > 0) {
-    currentAccount = accounts[0];
-    await afterLogin();
-  }
+  if (accounts.length > 0) { currentAccount = accounts[0]; await afterLogin(); }
 }
 
 async function doLogin() {
   document.getElementById('login-msg').textContent = 'Abrindo janela de login...';
   try {
-    var result = await msalApp.loginPopup({ scopes: CONFIG.scopes });
-    currentAccount = result.account;
+    var r = await msalApp.loginPopup({ scopes: CONFIG.scopes });
+    currentAccount = r.account;
     await afterLogin();
-  } catch(e) {
-    document.getElementById('login-msg').textContent = 'Erro ao fazer login: ' + e.message;
-  }
+  } catch(e) { document.getElementById('login-msg').textContent = 'Erro: ' + e.message; }
 }
 
 function doLogout() {
@@ -197,153 +216,129 @@ function doLogout() {
 }
 
 async function getToken() {
-  try {
-    var r = await msalApp.acquireTokenSilent({ scopes: CONFIG.scopes, account: currentAccount });
-    return r.accessToken;
-  } catch(e) {
-    var r = await msalApp.acquireTokenPopup({ scopes: CONFIG.scopes });
-    return r.accessToken;
-  }
+  try { var r = await msalApp.acquireTokenSilent({ scopes: CONFIG.scopes, account: currentAccount }); return r.accessToken; }
+  catch(e) { var r = await msalApp.acquireTokenPopup({ scopes: CONFIG.scopes }); return r.accessToken; }
 }
 
 async function afterLogin() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-name').textContent = currentAccount.name || currentAccount.username;
-
   showMsg('Conectando ao SharePoint...', 'info');
-  try {
-    await initSharePoint();
-    await loadAll();
-    showMsg('Conectado ao SharePoint com sucesso!', 'ok');
-  } catch(e) {
-    showMsg('Erro ao conectar ao SharePoint: ' + e.message, 'err');
-  }
+  try { await initSharePoint(); await loadAll(); showMsg('Conectado ao SharePoint com sucesso!', 'ok'); }
+  catch(e) { showMsg('Erro ao conectar: ' + e.message, 'err'); }
 }
 
-// Inicializa o MSAL após o DOM carregar
 window.addEventListener('DOMContentLoaded', function() {
-  initMsal().catch(function(e) {
-    document.getElementById('login-msg').textContent = 'Erro de inicialização: ' + e.message;
-  });
+  initMsal().catch(function(e) { document.getElementById('login-msg').textContent = 'Erro de inicialização: ' + e.message; });
 });
 
-// ═══════════════════════════════════════════════════════════════
-// SHAREPOINT — Inicialização e CRUD via Microsoft Graph
-// ═══════════════════════════════════════════════════════════════
+// ═══ GRAPH API ═══
 async function graphGet(url) {
   var token = await getToken();
-  var r = await fetch('https://graph.microsoft.com/v1.0' + url, {
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-  });
+  var r = await fetch('https://graph.microsoft.com/v1.0' + url, { headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } });
   if (!r.ok) { var e = await r.json(); throw new Error(e.error?.message || r.statusText); }
   return r.json();
 }
-
 async function graphPost(url, body) {
   var token = await getToken();
-  var r = await fetch('https://graph.microsoft.com/v1.0' + url, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  var r = await fetch('https://graph.microsoft.com/v1.0' + url, { method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}, body:JSON.stringify(body) });
   if (!r.ok) { var e = await r.json(); throw new Error(e.error?.message || r.statusText); }
   return r.json();
 }
-
-async function graphPatch(url, body) {
-  var token = await getToken();
-  var r = await fetch('https://graph.microsoft.com/v1.0' + url, {
-    method: 'PATCH',
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) { var e = await r.json(); throw new Error(e.error?.message || r.statusText); }
-  return r.json();
-}
-
 async function graphDelete(url) {
   var token = await getToken();
-  var r = await fetch('https://graph.microsoft.com/v1.0' + url, {
-    method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
+  var r = await fetch('https://graph.microsoft.com/v1.0' + url, { method:'DELETE', headers:{'Authorization':'Bearer '+token} });
   if (!r.ok && r.status !== 204) { var e = await r.json(); throw new Error(e.error?.message || r.statusText); }
 }
 
 async function initSharePoint() {
-  // Descobrir Site ID
-  var hostname = 'gpbrinfra.sharepoint.com';
-  var sitePath = '/sites/PlanejamentoBRInfra';
-  var site = await graphGet('/sites/' + hostname + ':' + sitePath);
+  var site = await graphGet('/sites/gpbrinfra.sharepoint.com:/sites/PlanejamentoBRInfra');
   SITE_ID = site.id;
-
-  // Descobrir List ID
   var lists = await graphGet('/sites/' + SITE_ID + '/lists?$filter=displayName eq \'' + CONFIG.listName + '\'');
-  if (!lists.value || lists.value.length === 0) throw new Error('Lista "' + CONFIG.listName + '" não encontrada no SharePoint.');
+  if (!lists.value || !lists.value.length) throw new Error('Lista "' + CONFIG.listName + '" não encontrada.');
   LIST_ID = lists.value[0].id;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CAMADA DE DADOS — lê e grava itens na SharePoint List
-// ═══════════════════════════════════════════════════════════════
 async function spGetAll() {
-  // Busca todos os itens da lista (campos relevantes)
-  var url = '/sites/' + SITE_ID + '/lists/' + LIST_ID +
-    '/items?$expand=fields($select=Title,MesFechado,Observacao,LucroLiquido,PercentRB,DadosJSON,DataRevisao)&$top=999';
+  var url = '/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items?$expand=fields($select=Title,Obra,MesFechado,Observacao,LucroLiquido,PercentRB,DadosJSON,DataRevisao)&$top=999';
   var r = await graphGet(url);
   return r.value || [];
 }
+async function spCreate(fields) { return graphPost('/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items', { fields: fields }); }
+async function spDelete(itemId) { return graphDelete('/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items/' + itemId); }
 
-async function spCreate(fields) {
-  var url = '/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items';
-  return graphPost(url, { fields: fields });
-}
+// ═══ ESTADO GLOBAL ═══
+var PARSED = null, ALL_REVS = [], REVS = [], MONTHS = ['TOTAL'], SP_ITEM_MAP = {};
+var OBRA_ATUAL = '';
+var OBRAS_USADAS = [];
 
-async function spUpdate(itemId, fields) {
-  var url = '/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items/' + itemId + '/fields';
-  return graphPatch(url, fields);
-}
-
-async function spDelete(itemId) {
-  var url = '/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items/' + itemId;
-  return graphDelete(url);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// VARIÁVEIS GLOBAIS
-// ═══════════════════════════════════════════════════════════════
-var PARSED = null, REVS = [], MONTHS = ['TOTAL'];
-// Mapa de id da revisão → id do item no SharePoint (para update/delete)
-var SP_ITEM_MAP = {};
-
-// ═══════════════════════════════════════════════════════════════
-// FUNÇÕES DE UI
-// ═══════════════════════════════════════════════════════════════
+// ═══ UI ═══
 function showTab(id) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['painel','gravar','comp','insights'][i] === id));
-  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === id));
+  document.querySelectorAll('.tab').forEach(function(t,i) { t.classList.toggle('active', ['painel','gravar','comp','insights'][i] === id); });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.toggle('active', p.id === id); });
 }
-
 function showMsg(t, tp) {
   var a = document.getElementById('msg-area');
   a.innerHTML = '<div class="msg ' + tp + '">' + t + '<button onclick="this.parentNode.remove()">×</button></div>';
 }
+function fNum(v) { if (!v && v !== 0) return '-'; var n = Math.round(v); return n === 0 ? '-' : new Intl.NumberFormat('pt-BR').format(n); }
+function fPct(v) { if (!v) return '-'; return (Math.abs(v) > 1 ? v : v * 100).toFixed(2) + '%'; }
 
-function fNum(v) {
-  if (!v && v !== 0) return '-';
-  var n = Math.round(v);
-  return n === 0 ? '-' : new Intl.NumberFormat('pt-BR').format(n);
+// ═══ OBRA ═══
+function obraInputChanged() {
+  var sel = document.getElementById('obra-input').value;
+  document.getElementById('obra-nova').style.display = sel === '__nova__' ? 'block' : 'none';
 }
 
-function fPct(v) {
-  if (!v) return '-';
-  return (Math.abs(v) > 1 ? v : v * 100).toFixed(2) + '%';
+function getObraInput() {
+  var sel = document.getElementById('obra-input').value;
+  if (sel === '__nova__') return document.getElementById('obra-nova').value.trim();
+  return sel;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LEITURA DO EXCEL
-// ═══════════════════════════════════════════════════════════════
+function obraChanged() {
+  OBRA_ATUAL = document.getElementById('obra-global').value;
+  var badge = document.getElementById('obra-badge');
+  if (OBRA_ATUAL) {
+    badge.textContent = OBRA_ATUAL;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+  // Filtra revisões da obra
+  REVS = ALL_REVS.filter(function(r) { return r.obra === OBRA_ATUAL; });
+  // Atualiza meses
+  var allMonths = [];
+  REVS.forEach(function(r) { if (r.months) r.months.forEach(function(m) { if (allMonths.indexOf(m) < 0) allMonths.push(m); }); });
+  MONTHS = ['TOTAL'].concat(allMonths);
+  // Atualiza comp info
+  var compInfo = document.getElementById('comp-obra-info');
+  var compNome = document.getElementById('comp-obra-nome');
+  if (OBRA_ATUAL) { compInfo.style.display = 'flex'; compNome.textContent = OBRA_ATUAL; }
+  else { compInfo.style.display = 'none'; }
+  renderPainel(); renderSelects(); renderInsights();
+}
+
+function renderObraSelector() {
+  var sel = document.getElementById('obra-global');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Selecione a obra —</option>';
+  // Obras que têm revisões gravadas
+  var obrasComRevs = [];
+  ALL_REVS.forEach(function(r) { if (r.obra && obrasComRevs.indexOf(r.obra) < 0) obrasComRevs.push(r.obra); });
+  // Obras fixas + extras usadas
+  var todasObras = OBRAS_FIXAS.slice();
+  obrasComRevs.forEach(function(o) { if (todasObras.indexOf(o) < 0) todasObras.push(o); });
+  todasObras.sort();
+  todasObras.forEach(function(o) {
+    var temRevs = obrasComRevs.indexOf(o) >= 0;
+    sel.innerHTML += '<option value="' + o + '"' + (o === cur ? ' selected' : '') + '>' + o + (temRevs ? ' ✓' : '') + '</option>';
+  });
+  if (cur) sel.value = cur;
+}
+
+// ═══ EXCEL ═══
 function excelSerial(s) {
   if (!s || typeof s !== 'number' || s < 40000) return null;
   var d = new Date(Date.UTC(1899, 11, 30) + s * 86400000);
@@ -361,18 +356,13 @@ function parseBudget(ab) {
   for (var i = 0; i < Math.min(10, rows.length); i++) {
     if (rows[i] && rows[i].some(function(c) { return c && String(c).includes('UAU'); })) { hdr = i; break; }
   }
-  var h = rows[hdr];
-  var dcIdx = [], dcName = [];
-  for (var c = 0; c < h.length; c++) {
-    var mm = excelSerial(h[c]);
-    if (mm) { dcIdx.push(c); dcName.push(mm); }
-  }
+  var h = rows[hdr], dcIdx = [], dcName = [];
+  for (var c = 0; c < h.length; c++) { var mm = excelSerial(h[c]); if (mm) { dcIdx.push(c); dcName.push(mm); } }
   var items = [], ll = 0, pct = 0;
   for (var r = hdr + 1; r < rows.length; r++) {
-    var row = rows[r];
-    if (!row) continue;
-    var code = (row[0] ? String(row[0]).trim() : '');
-    var desc = (row[1] ? String(row[1]).trim() : '');
+    var row = rows[r]; if (!row) continue;
+    var code = row[0] ? String(row[0]).trim() : '';
+    var desc = row[1] ? String(row[1]).trim() : '';
     if (!code && !desc) continue;
     var bt = row[3] || 0;
     var vals = dcIdx.map(function(ci) { return row[ci] || 0; });
@@ -402,42 +392,43 @@ function handleFile(inp) {
   reader.readAsArrayBuffer(f);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// GRAVAR REVISÃO → SharePoint
-// ═══════════════════════════════════════════════════════════════
+// ═══ GRAVAR ═══
 async function saveRevision() {
   if (!PARSED) { showMsg('Carregue o arquivo Budget primeiro.', 'err'); return; }
+  var obra = getObraInput();
+  if (!obra) { showMsg('Selecione ou informe a obra.', 'err'); return; }
   var mf = document.getElementById('mes-input').value.toUpperCase().trim();
   var obs = document.getElementById('obs-input').value.trim();
   if (!mf) { showMsg('Informe o mês de fechamento.', 'err'); return; }
   if (!/^[A-Z]{3}\/(20\d\d|\d\d)$/.test(mf)) { showMsg('Formato inválido. Use MMM/AAAA', 'err'); return; }
-  if (mf.length === 6) mf = mf.slice(0, 3) + '/20' + mf.slice(4);
 
   var btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = 'Gravando no SharePoint...';
   showMsg('Enviando dados ao SharePoint...', 'info');
 
   try {
-    // Gera ID sequencial baseado nas revisões existentes
-    var num = REVS.length > 0 ? Math.max.apply(null, REVS.map(function(x) { return parseInt(x.id.replace('R','')) || 0; })) + 1 : 1;
+    // ID sequencial por obra
+    var revsObra = ALL_REVS.filter(function(r) { return r.obra === obra; });
+    var num = revsObra.length > 0 ? Math.max.apply(null, revsObra.map(function(x) { return parseInt(x.id.replace('R','')) || 0; })) + 1 : 1;
     var id = 'R' + String(num).padStart(3, '0');
 
-    // Serializa os dados do budget (JSON compacto)
     var dadosJSON = JSON.stringify({ months: PARSED.months, items: PARSED.items });
 
-    // Grava no SharePoint List
-    var spItem = await spCreate({
-      Title:         id,
-      MesFechado:    mf,
-      Observacao:    obs,
-      LucroLiquido:  PARSED.lucroLiquido,
-      PercentRB:     PARSED.percentRB,
-      DadosJSON:     dadosJSON,
-      DataRevisao:   new Date().toISOString()
+    await spCreate({
+      Title:        obra + '_' + id,
+      Obra:         obra,
+      MesFechado:   mf,
+      Observacao:   obs,
+      LucroLiquido: PARSED.lucroLiquido,
+      PercentRB:    PARSED.percentRB,
+      DadosJSON:    dadosJSON,
+      DataRevisao:  new Date().toISOString()
     });
 
-    // Limpa formulário
     PARSED = null;
+    document.getElementById('obra-input').value = '';
+    document.getElementById('obra-nova').style.display = 'none';
+    document.getElementById('obra-nova').value = '';
     document.getElementById('file-input').value = '';
     document.getElementById('mes-input').value = '';
     document.getElementById('obs-input').value = '';
@@ -445,7 +436,10 @@ async function saveRevision() {
     btn.disabled = false; btn.textContent = '>> Gravar Revisão';
 
     await loadAll();
-    showMsg('Revisão ' + id + ' gravada no SharePoint com sucesso!', 'ok');
+    // Seleciona a obra recém gravada
+    document.getElementById('obra-global').value = obra;
+    obraChanged();
+    showMsg('Revisão ' + id + ' da obra ' + obra + ' gravada com sucesso!', 'ok');
     showTab('painel');
   } catch(ex) {
     showMsg('Erro ao gravar: ' + ex.message, 'err');
@@ -453,72 +447,57 @@ async function saveRevision() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// EXCLUIR REVISÃO
-// ═══════════════════════════════════════════════════════════════
-async function deleteRev(id) {
-  if (!confirm('Excluir revisão ' + id + '? Esta ação afeta todos os usuários.')) return;
+// ═══ EXCLUIR ═══
+async function deleteRev(titleKey) {
+  if (!confirm('Excluir esta revisão? Esta ação afeta todos os usuários.')) return;
   try {
-    var spId = SP_ITEM_MAP[id];
-    if (!spId) { showMsg('Item não encontrado no SharePoint.', 'err'); return; }
+    var spId = SP_ITEM_MAP[titleKey];
+    if (!spId) { showMsg('Item não encontrado.', 'err'); return; }
     await spDelete(spId);
     await loadAll();
-    showMsg(id + ' excluída do SharePoint.', 'ok');
+    obraChanged();
+    showMsg('Revisão excluída.', 'ok');
   } catch(ex) { showMsg('Erro: ' + ex.message, 'err'); }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CARREGAR TODAS AS REVISÕES DO SHAREPOINT
-// ═══════════════════════════════════════════════════════════════
+// ═══ CARREGAR TUDO ═══
 async function loadAll() {
   try {
     var items = await spGetAll();
     SP_ITEM_MAP = {};
     var revs = [];
-    var allMonths = [];
-
     items.forEach(function(item) {
-      var f = item.fields;
-      if (!f || !f.Title) return;
-      SP_ITEM_MAP[f.Title] = item.id; // mapeia revisão → id do item SP
-
+      var f = item.fields; if (!f || !f.Title) return;
+      SP_ITEM_MAP[f.Title] = item.id;
+      var months = [];
+      try { var d = JSON.parse(f.DadosJSON || '{}'); if (d.months) months = d.months; } catch(e) {}
       revs.push({
-        id:           f.Title,
+        titleKey:     f.Title,
+        id:           f.Title.split('_').pop() || f.Title,
+        obra:         f.Obra || '',
         date:         f.DataRevisao || item.createdDateTime,
         mesFechado:   f.MesFechado || '',
         obs:          f.Observacao || '',
         lucroLiquido: parseFloat(f.LucroLiquido) || 0,
-        percentRB:    parseFloat(f.PercentRB) || 0
+        percentRB:    parseFloat(f.PercentRB) || 0,
+        months:       months
       });
-
-      // Coleta meses dos dados JSON
-      try {
-        var d = JSON.parse(f.DadosJSON || '{}');
-        if (d.months) d.months.forEach(function(m) { if (allMonths.indexOf(m) < 0) allMonths.push(m); });
-      } catch(e) {}
     });
-
-    // Ordena revisões por número
     revs.sort(function(a,b) { return parseInt(a.id.replace('R','')) - parseInt(b.id.replace('R','')); });
-    REVS = revs;
-    MONTHS = ['TOTAL'].concat(allMonths);
-
-    renderPainel(); renderSelects(); renderInsights();
-  } catch(ex) {
-    showMsg('Erro ao carregar dados: ' + ex.message, 'err');
-  }
+    ALL_REVS = revs;
+    renderObraSelector();
+    // Mantém obra selecionada
+    if (OBRA_ATUAL) { document.getElementById('obra-global').value = OBRA_ATUAL; obraChanged(); }
+  } catch(ex) { showMsg('Erro ao carregar dados: ' + ex.message, 'err'); }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// RENDERIZAÇÃO
-// ═══════════════════════════════════════════════════════════════
+// ═══ PAINEL ═══
 function renderPainel() {
   var el = document.getElementById('painel-content');
-  if (!REVS.length) {
-    el.innerHTML = '<div class="empty">Nenhuma revisão gravada.<br><span style="font-size:11px">Use "Gravar Revisão" para começar.</span></div>';
-    return;
-  }
-  var h = '<div class="scroll-x"><table class="tbl"><thead><tr><th>Revisão</th><th>Data / Hora</th><th>Mês Fechado</th><th class="r">Lucro Líquido (R$)</th><th class="r">% sobre RB</th><th>Observação</th><th></th></tr></thead><tbody>';
+  if (!OBRA_ATUAL) { el.innerHTML = '<div class="empty">Selecione uma obra no seletor acima para ver as revisões.</div>'; return; }
+  if (!REVS.length) { el.innerHTML = '<div class="empty">Nenhuma revisão gravada para esta obra.<br><span style="font-size:11px">Use "Gravar Revisão" para começar.</span></div>'; return; }
+  var h = '<div class="obra-section"><span>🏗️ ' + OBRA_ATUAL + '</span><span style="color:#888;font-size:11px;margin-left:8px">— ' + REVS.length + ' revisão(ões)</span></div>';
+  h += '<div class="scroll-x"><table class="tbl"><thead><tr><th>Revisão</th><th>Data / Hora</th><th>Mês Fechado</th><th class="r">Lucro Líquido (R$)</th><th class="r">% sobre RB</th><th>Observação</th><th></th></tr></thead><tbody>';
   REVS.forEach(function(rev) {
     var cor = rev.lucroLiquido >= 0 ? '#0A7832' : '#B41E1E';
     h += '<tr><td style="font-weight:700;color:var(--ve)">' + rev.id + '</td>' +
@@ -527,16 +506,17 @@ function renderPainel() {
          '<td class="r" style="font-weight:700;color:' + cor + '">' + fNum(rev.lucroLiquido) + '</td>' +
          '<td class="r" style="color:' + cor + '">' + fPct(rev.percentRB) + '</td>' +
          '<td style="color:#888;font-size:11px">' + (rev.obs || '—') + '</td>' +
-         '<td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteRev(\'' + rev.id + '\')">Excluir</button></td></tr>';
+         '<td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteRev(\'' + rev.titleKey + '\')">Excluir</button></td></tr>';
   });
   el.innerHTML = h + '</tbody></table></div>';
 }
 
+// ═══ SELECTS COMPARATIVO ═══
 function renderSelects() {
   ['sel-base','sel-atual'].forEach(function(sid) {
     var sel = document.getElementById(sid); var cur = sel.value;
     sel.innerHTML = '<option value="">Selecione...</option>';
-    REVS.forEach(function(r) { sel.innerHTML += '<option value="' + r.id + '"' + (r.id === cur ? ' selected' : '') + '>' + r.id + ' — ' + r.mesFechado + '</option>'; });
+    REVS.forEach(function(r) { sel.innerHTML += '<option value="' + r.titleKey + '"' + (r.titleKey === cur ? ' selected' : '') + '>' + r.id + ' — ' + r.mesFechado + '</option>'; });
   });
   var sm = document.getElementById('sel-mes'); var curm = sm.value; sm.innerHTML = '';
   MONTHS.forEach(function(m) { sm.innerHTML += '<option value="' + m + '"' + (m === curm ? ' selected' : '') + '>' + m + '</option>'; });
@@ -544,34 +524,33 @@ function renderSelects() {
 
 function showMeses() { showMsg('Meses: ' + MONTHS.join(' | '), 'info'); }
 
-// ═══════════════════════════════════════════════════════════════
-// COMPARATIVO
-// ═══════════════════════════════════════════════════════════════
+// ═══ COMPARATIVO ═══
 async function gerarComp() {
+  if (!OBRA_ATUAL) { showMsg('Selecione uma obra primeiro.', 'err'); return; }
   var rb = document.getElementById('sel-base').value;
   var ra = document.getElementById('sel-atual').value;
   var fil = document.getElementById('sel-mes').value.toUpperCase().trim();
   if (!rb || !ra) { showMsg('Selecione as duas revisões.', 'err'); return; }
+  if (rb === ra) { showMsg('Selecione revisões diferentes.', 'err'); return; }
 
   showMsg('Buscando dados no SharePoint...', 'info');
   document.getElementById('comp-table').innerHTML = '<div class="empty">Calculando...</div>';
 
   try {
-    // Busca os DadosJSON diretamente do SharePoint para as duas revisões
-    async function getDados(revId) {
-      var spId = SP_ITEM_MAP[revId];
-      if (!spId) throw new Error('Item ' + revId + ' não encontrado.');
+    async function getDados(titleKey) {
+      var spId = SP_ITEM_MAP[titleKey];
+      if (!spId) throw new Error('Item não encontrado.');
       var item = await graphGet('/sites/' + SITE_ID + '/lists/' + LIST_ID + '/items/' + spId + '/fields');
-      if (!item.DadosJSON) throw new Error('Dados JSON ausentes para ' + revId);
+      if (!item.DadosJSON) throw new Error('Dados JSON ausentes.');
       return JSON.parse(item.DadosJSON);
     }
 
-    var d1 = await getDados(rb);
-    var d2 = await getDados(ra);
+    var d1 = await getDados(rb), d2 = await getDados(ra);
+    var revB = REVS.find(function(r) { return r.titleKey === rb; });
+    var revA = REVS.find(function(r) { return r.titleKey === ra; });
 
     function getVal(data, filtro) {
-      var map = {};
-      var months = data.months || [];
+      var map = {}, months = data.months || [];
       data.items.forEach(function(it) {
         var k = it.code + '||' + it.desc;
         var v = filtro === 'TOTAL' ? (it.bt || 0) : (function(){ var mi = months.indexOf(filtro); return (mi >= 0 && it.vals) ? (it.vals[mi] || 0) : 0; })();
@@ -583,50 +562,49 @@ async function gerarComp() {
 
     var m1 = getVal(d1, fil), m2 = getVal(d2, fil);
     var keys = [];
-    d1.items.forEach(function(it) { var k = it.code + '||' + it.desc; if (keys.indexOf(k) < 0) keys.push(k); });
-    Object.keys(m2).forEach(function(k) { if (keys.indexOf(k) < 0) keys.push(k); });
+    d1.items.forEach(function(it) { var k = it.code+'||'+it.desc; if (keys.indexOf(k)<0) keys.push(k); });
+    Object.keys(m2).forEach(function(k) { if (keys.indexOf(k)<0) keys.push(k); });
 
     var rows = keys.map(function(k) {
-      var v1 = (m1[k] && m1[k].val) || 0, v2 = (m2[k] && m2[k].val) || 0;
-      var cd = (m1[k] || m2[k]).code, ds = (m1[k] || m2[k]).desc;
-      return {code:cd, desc:ds, v1:v1, v2:v2, vr:v2-v1, vp: v1 !== 0 ? (v2-v1)/Math.abs(v1) : 0};
+      var v1=(m1[k]&&m1[k].val)||0, v2=(m2[k]&&m2[k].val)||0;
+      var cd=(m1[k]||m2[k]).code, ds=(m1[k]||m2[k]).desc;
+      return {code:cd,desc:ds,v1:v1,v2:v2,vr:v2-v1,vp:v1!==0?(v2-v1)/Math.abs(v1):0};
     });
 
-    var mB = REVS.find(function(r) { return r.id === rb; });
-    var mA = REVS.find(function(r) { return r.id === ra; });
-    document.getElementById('comp-info').innerHTML = rb + ': ' + mB.mesFechado + ' &nbsp;|&nbsp; ' + ra + ': ' + mA.mesFechado + ' &nbsp;|&nbsp; Filtro: <b>' + fil + '</b> &nbsp;|&nbsp; ' + rows.length + ' itens';
+    document.getElementById('comp-info').innerHTML =
+      revB.id + ': ' + revB.mesFechado + ' &nbsp;|&nbsp; ' + revA.id + ': ' + revA.mesFechado +
+      ' &nbsp;|&nbsp; Filtro: <b>' + fil + '</b> &nbsp;|&nbsp; ' + rows.length + ' itens';
 
     var h = '<div class="scroll-x"><table class="tbl"><thead><tr>' +
       '<th style="width:80px">Código</th><th>Descrição</th>' +
-      '<th class="r">' + rb + '</th><th class="r">' + ra + '</th>' +
+      '<th class="r">' + revB.id + '</th><th class="r">' + revA.id + '</th>' +
       '<th class="r">Variação (R$)</th><th class="r">Var %</th>' +
       '<th style="text-align:center">Status</th></tr></thead><tbody>';
 
     rows.forEach(function(it, i) {
-      var isDesp = (it.code && it.code.slice(0,2) === 'B2') || (!it.code && it.desc.startsWith('(-)'));
-      var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var neu = Math.abs(it.vr) < 0.01;
-      var cor = neu ? '#888' : (bad ? '#B41E1E' : '#0A7832');
-      var st = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
-      var dsc = it.desc || '';
-      var niv = !it.code ? 0 : it.code.length <= 2 ? 1 : it.code.length === 3 ? 2 : it.code.length === 4 ? 3 : 4;
-      var isTot = (niv === 1) || (dsc.startsWith('( = )') || dsc.includes('Lucro L') || dsc.includes('EBITDA') || dsc.includes('LAIR'));
-      var isSep = !it.code && dsc === dsc.toUpperCase() && dsc.includes(' ') && dsc.length > 5;
-      var bg, fc, fw = 'normal';
-      if (isTot) { bg='#103D39'; fc='#fff'; fw='bold'; }
-      else if (niv===2) { bg='#EAF4F0'; fc='#103D39'; fw='bold'; }
-      else if (niv===3) { bg='#F5FCF9'; fw='bold'; fc='inherit'; }
-      else if (isSep) { bg='#C8D2CD'; fc='#103D39'; fw='bold'; }
-      else { bg = i%2===0 ? '#fff' : '#EAF4F0'; fc='inherit'; }
-      var vc = isTot ? '#F4D19D' : cor;
-      h += '<tr style="background:' + bg + ';color:' + fc + ';font-weight:' + fw + '">' +
-        '<td style="font-size:11px">' + it.code + '</td>' +
-        '<td style="' + (it.code==='' && dsc.startsWith('(') ? 'padding-left:20px' : '') + '">' + dsc + '</td>' +
-        '<td class="r">' + fNum(it.v1) + '</td>' +
-        '<td class="r">' + fNum(it.v2) + '</td>' +
-        '<td class="r" style="color:' + vc + ';font-weight:700">' + (neu ? '—' : (it.vr>0?'+':'') + fNum(it.vr)) + '</td>' +
-        '<td class="r" style="color:' + vc + '">' + (neu ? '—' : (it.vp*100).toFixed(1)+'%') + '</td>' +
-        '<td style="text-align:center;color:' + (isTot?'#F4D19D':cor) + ';font-size:11px;font-weight:700">' + st + '</td></tr>';
+      var isDesp=(it.code&&it.code.slice(0,2)==='B2')||(!it.code&&it.desc.startsWith('(-)'));
+      var bad=isDesp?(it.vr>0):(it.vr<0), neu=Math.abs(it.vr)<0.01;
+      var cor=neu?'#888':(bad?'#B41E1E':'#0A7832');
+      var st=neu?'Igual':(it.vr>0?'(+) Aumento':'(-) Redução');
+      var dsc=it.desc||'';
+      var niv=!it.code?0:it.code.length<=2?1:it.code.length===3?2:it.code.length===4?3:4;
+      var isTot=(niv===1)||(dsc.startsWith('( = )')||dsc.includes('Lucro L')||dsc.includes('EBITDA')||dsc.includes('LAIR'));
+      var isSep=!it.code&&dsc===dsc.toUpperCase()&&dsc.includes(' ')&&dsc.length>5;
+      var bg,fc,fw='normal';
+      if(isTot){bg='#103D39';fc='#fff';fw='bold';}
+      else if(niv===2){bg='#EAF4F0';fc='#103D39';fw='bold';}
+      else if(niv===3){bg='#F5FCF9';fw='bold';fc='inherit';}
+      else if(isSep){bg='#C8D2CD';fc='#103D39';fw='bold';}
+      else{bg=i%2===0?'#fff':'#EAF4F0';fc='inherit';}
+      var vc=isTot?'#F4D19D':cor;
+      h+='<tr style="background:'+bg+';color:'+fc+';font-weight:'+fw+'">'+
+        '<td style="font-size:11px">'+it.code+'</td>'+
+        '<td style="'+(it.code===''&&dsc.startsWith('(')?'padding-left:20px':'')+'">'+ dsc+'</td>'+
+        '<td class="r">'+fNum(it.v1)+'</td>'+
+        '<td class="r">'+fNum(it.v2)+'</td>'+
+        '<td class="r" style="color:'+vc+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>'+
+        '<td class="r" style="color:'+vc+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>'+
+        '<td style="text-align:center;color:'+(isTot?'#F4D19D':cor)+';font-size:11px;font-weight:700">'+st+'</td></tr>';
     });
     document.getElementById('comp-table').innerHTML = h + '</tbody></table></div>';
     showMsg('Comparativo gerado: ' + rows.length + ' itens.', 'ok');
@@ -636,21 +614,19 @@ async function gerarComp() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// INSIGHTS
-// ═══════════════════════════════════════════════════════════════
+// ═══ INSIGHTS ═══
 function renderInsights() {
   var el = document.getElementById('insights-content');
-  if (!REVS.length) { el.innerHTML = '<div class="empty">Nenhuma revisão gravada.</div>'; return; }
-  var h = '<div class="scroll-x"><table class="tbl"><thead><tr><th style="min-width:180px">Item</th>';
-  REVS.forEach(function(r) { h += '<th class="r">' + r.id + '</th>'; });
+  if (!OBRA_ATUAL) { el.innerHTML = '<div class="empty">Selecione uma obra para ver os insights.</div>'; return; }
+  if (!REVS.length) { el.innerHTML = '<div class="empty">Nenhuma revisão para esta obra.</div>'; return; }
+  var h = '<div class="obra-section"><span>🏗️ ' + OBRA_ATUAL + '</span></div>';
+  h += '<div class="scroll-x"><table class="tbl"><thead><tr><th style="min-width:180px">Item</th>';
+  REVS.forEach(function(r) { h += '<th class="r">' + r.id + '<br><span style="font-weight:400;font-size:10px">' + r.mesFechado + '</span></th>'; });
   h += '</tr></thead><tbody>';
   h += '<tr><td class="ins-label">Lucro Líquido (R$)</td>';
   REVS.forEach(function(r) { h += '<td class="ins-val" style="color:' + (r.lucroLiquido>=0?'#0A7832':'#B41E1E') + '">' + fNum(r.lucroLiquido) + '</td>'; });
   h += '</tr><tr><td class="ins-label">% sobre RB</td>';
   REVS.forEach(function(r) { h += '<td class="ins-val" style="color:' + (r.lucroLiquido>=0?'#0A7832':'#B41E1E') + '">' + fPct(r.percentRB) + '</td>'; });
-  h += '</tr><tr><td class="ins-sub">Mês Fechado</td>';
-  REVS.forEach(function(r) { h += '<td class="ins-subval">' + r.mesFechado + '</td>'; });
   h += '</tr><tr><td class="ins-sub">Data da Revisão</td>';
   REVS.forEach(function(r) { h += '<td class="ins-subval">' + new Date(r.date).toLocaleDateString('pt-BR') + '</td>'; });
   el.innerHTML = h + '</tr></tbody></table></div>';

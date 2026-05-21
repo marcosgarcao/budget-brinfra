@@ -588,6 +588,40 @@ async function gerarComp() {
     });
     if (corteIdx >= 0) rows = rows.slice(0, corteIdx);
 
+    // Injeta linha de % Lucro Líquido após o ( = ) Lucro Líquido
+    var llIdx = rows.findIndex(function(r) {
+      return (r.desc||'').includes('Lucro L') && (r.desc||'').includes('( = )');
+    });
+    // Também tenta ( = ) Lucro Liquido sem acento
+    if (llIdx < 0) llIdx = rows.findIndex(function(r) {
+      return /^\( = \)\s*Lucro/i.test((r.desc||'').trim());
+    });
+    // Busca a linha % sobre (RB) que pode já existir mas foi cortada
+    var pctRbExists = rows.some(function(r) { return /% sobre.*RB/i.test(r.desc||''); });
+
+    if (llIdx >= 0 && !pctRbExists) {
+      // Calcula % sobre RB para ambas as revisões
+      // Pega Receita Bruta
+      var rbRow1 = rows.find(function(r) { return /^Receita Bruta/.test((r.desc||'').trim()) && !r.code; });
+      var rb1 = rbRow1 ? rbRow1.v1 : 0;
+      var rb2 = rbRow1 ? rbRow1.v2 : 0;
+      var ll1 = rows[llIdx].v1;
+      var ll2 = rows[llIdx].v2;
+      var pct1 = rb1 ? (ll1 / rb1) * 100 : 0;
+      var pct2 = rb2 ? (ll2 / rb2) * 100 : 0;
+      var pctR = pct2 - pct1;
+      rows.splice(llIdx + 1, 0, {
+        code: '',
+        desc: '% sobre (RB)',
+        v1: pct1,
+        v2: pct2,
+        vr: pctR,
+        vp: pct1 ? pctR / Math.abs(pct1) : 0,
+        _isPct: true,
+        _pctRow: true
+      });
+    }
+
     // Guarda rows globalmente para exportação
     window._compRows = rows;
     window._compRevB = revB;
@@ -654,95 +688,60 @@ async function gerarComp() {
       var dsc = it.desc ? it.desc.trim() : '';
       var cod = it.code ? it.code.trim() : '';
       var neu = Math.abs(it.vr) < 0.01;
-      var niv = cod.length;
 
-      // ── Classificação das linhas SEM código ─────────────────
-      var isRes_escuro = !cod && (
-        /^\( = \)\s*(Margem|EBITDA)/.test(dsc) ||
-        /^\( = \)\s*LAIR/.test(dsc)
-      );
-      var isRes_verde = !cod && (
-        /^\( = \)\s*(Lucro|Margem de C)/.test(dsc) ||
-        /^LAIR\b/.test(dsc) ||
-        /^Lucro Depois/.test(dsc) ||
-        /^\( = \)\s*Lucro/.test(dsc)
-      );
-      var isRes_verde_pct = !cod && !isRes_verde && !isRes_escuro && (
-        dsc.startsWith('%') || /OH %|% sobre/.test(dsc)
-      );
-      var isTotalRed = !cod && (
-        /^TOTAL (RECEITA|DESPESA)/.test(dsc) ||
-        /^Receita Bruta/.test(dsc)
-      );
-      var isRlAmarelo = !cod && /^Receita L.?quida/.test(dsc);
-      var isDespGray  = !cod && dsc.startsWith('DESPESA:');
-      var isFluxo     = !cod && dsc === 'FLUXO DE CAIXA';
-      var isDetalheNC = !cod && !isRes_escuro && !isRes_verde && !isRes_verde_pct &&
-                        !isTotalRed && !isRlAmarelo && !isDespGray && !isFluxo;
+      // Linha de % injetada
+      if (it._pctRow) {
+        var p1 = it.v1 ? it.v1.toFixed(2) + '%' : '—';
+        var p2 = it.v2 ? it.v2.toFixed(2) + '%' : '—';
+        var pv = Math.abs(it.vr) < 0.001 ? '—' : (it.vr > 0 ? '+' : '') + it.vr.toFixed(2) + 'p.p.';
+        var pc = Math.abs(it.vr) < 0.001 ? '#888' : (it.vr > 0 ? '#0A7832' : '#C0392B');
+        h += '<tr style="background:#D9F0E5;font-size:11px;font-weight:normal">' +
+          '<td style="font-size:10px;color:#AAA"></td>' +
+          '<td style="color:#103D39;padding-left:16px;font-style:italic">% sobre (RB)</td>' +
+          '<td class="r" style="color:#103D39">' + p1 + '</td>' +
+          '<td class="r" style="color:#103D39">' + p2 + '</td>' +
+          '<td class="r" style="color:' + pc + ';font-weight:700">' + pv + '</td>' +
+          '<td class="r" style="color:' + pc + '">—</td>' +
+          '<td style="text-align:center;color:' + pc + ';font-size:11px;font-weight:700">' + (Math.abs(it.vr) < 0.001 ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução')) + '</td></tr>';
+        return;
+      }
 
-      // ── Cor da variação ─────────────────────────────────────
+      // ── Cor da variação ─────────────────────────────────────────
       var isDesp = (cod && cod.slice(0,2) === 'B2') ||
                    /^DESPESA/.test(dsc) ||
+                   /^TOTAL DESPESA/.test(dsc) ||
                    /^\( - \)\s*(Custo|Despesa|IR|CSLL|FD|Deprecia|Imposto)/.test(dsc);
       var bad  = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var corC = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');   // fundo claro
-      var corB = neu ? 'rgba(255,255,255,0.5)' : (bad ? '#FFAAAA' : '#80FFB0'); // fundo escuro
-      var corY = neu ? '#888888' : (bad ? '#8B0000' : '#005A1F');   // fundo amarelo
+      var corC = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');
+      var corE = neu ? 'rgba(255,255,255,0.45)' : (bad ? '#FFAAAA' : '#7FFFD4');
       var st   = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
 
-      var bg, fc, fw, fs = '12px', cor, codCol = '#AAAAAA', indent = '';
+      // ── Regra de cores ──────────────────────────────────────────
+      // VERDE ESCURO: B1/B2, TOTAL RECEITA/DESPESA, qualquer linha com ( = )
+      var isVerde = (cod && cod.length <= 2) ||
+                    (!cod && /^TOTAL (RECEITA|DESPESA)/.test(dsc)) ||
+                    dsc.includes('( = )');
 
-      // ── LINHAS COM CÓDIGO B ──────────────────────────────────
-      if (cod) {
-        if (niv <= 2) {
-          // B1, B2 → VERMELHO
-          bg = '#FF0000'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'rgba(255,255,255,0.6)';
-        } else if (niv === 3) {
-          // B11, B12... → AMARELO
-          bg = '#FFFF00'; fc = '#000000'; fw = 'bold'; cor = corY; codCol = '#666600';
-        } else if (niv === 4) {
-          // B111... → BRANCO, bold
-          bg = '#FFFFFF'; fc = '#000000'; fw = 'bold'; cor = corC;
-        } else if (niv === 5) {
-          // B1111... → CINZA CLARO
-          bg = '#F2F2F2'; fc = '#222222'; fw = 'normal'; cor = corC;
-        } else {
-          // B11101+ → ZEBRA
-          bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5F5F5';
-          fc = '#222222'; fw = 'normal'; cor = corC; zebra++;
-        }
+      var bg, fc, fw, fs = '12px', cor, indent = '';
 
-      // ── LINHAS SEM CÓDIGO ────────────────────────────────────
-      } else if (isRes_escuro) {
-        // ( = ) Margem / EBITDA / LAIR → ESCURO
-        bg = '#1F1F1F'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'transparent';
-      } else if (isRes_verde) {
-        // LAIR header / Lucro Depois / ( = ) Lucro Líquido → VERDE
-        bg = '#00B050'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'transparent';
-      } else if (isRes_verde_pct) {
-        // % linhas → VERDE CLARO
-        bg = '#D9F0E5'; fc = '#00522A'; fw = 'normal'; fs = '11px'; cor = corY;
-      } else if (isTotalRed) {
-        // TOTAL RECEITA / TOTAL DESPESA / Receita Bruta → VERMELHO
-        bg = '#FF0000'; fc = '#000000'; fw = 'bold'; cor = corB;
-      } else if (isRlAmarelo) {
-        // Receita Líquida (RL) → AMARELO
-        bg = '#FFFF00'; fc = '#000000'; fw = 'bold'; cor = corY;
-      } else if (isDespGray) {
-        // DESPESA: → CINZA
-        bg = '#808080'; fc = '#FFFFFF'; fw = 'normal'; cor = corB;
-      } else if (isFluxo) {
-        // FLUXO DE CAIXA → branco bold
-        bg = '#FFFFFF'; fc = '#000000'; fw = 'bold'; cor = corC;
+      if (isVerde) {
+        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold'; cor = corE;
       } else {
-        // Detalhe normal → ZEBRA
-        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5F5F5';
+        // Tudo o resto: zebra simples, sem cores especiais
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#EAF4F0';
         fc = '#222222'; fw = 'normal'; cor = corC; zebra++;
+        // Bold para sub-grupos (B11, B111, etc.)
+        if (cod && cod.length >= 3 && cod.length <= 5) fw = 'bold';
+        // Leve indentação para sublinhas ( - ) / ( + )
         if (/^\( [-+] \)/.test(dsc)) indent = 'padding-left:16px';
+        // % linhas em fonte menor
+        if (!cod && (dsc.startsWith('%') || /OH %|% sobre/.test(dsc))) {
+          fs = '11px'; fc = '#555555';
+        }
       }
 
       h += '<tr style="background:' + bg + ';font-size:' + fs + ';font-weight:' + fw + '">' +
-        '<td style="font-size:10px;color:' + codCol + ';font-weight:normal">' + cod + '</td>' +
+        '<td style="font-size:10px;color:' + (isVerde ? 'rgba(255,255,255,0.4)' : '#AAAAAA') + ';font-weight:normal">' + cod + '</td>' +
         '<td style="color:' + fc + ';' + indent + '">' + dsc + '</td>' +
         '<td class="r" style="color:' + fc + '">' + fNum(it.v1) + '</td>' +
         '<td class="r" style="color:' + fc + '">' + fNum(it.v2) + '</td>' +

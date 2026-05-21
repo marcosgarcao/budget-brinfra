@@ -619,8 +619,7 @@ async function gerarComp() {
       var cod = it.code || '';
       var neu = Math.abs(it.vr) < 0.01;
 
-      // ── Nível hierárquico pelo código B ──────────────────────────
-      // niv 0 = sem código | 1 = B1/B2 | 2 = B11 | 3 = B111 | 4 = B1111 | 5 = B11101
+      // ── Nível hierárquico pelo código B ─────────────────────────
       var niv = 0;
       if (cod) {
         if      (cod.length <= 2)  niv = 1;
@@ -630,101 +629,115 @@ async function gerarComp() {
         else                       niv = 5;
       }
 
-      // ── Classificação semântica ───────────────────────────────────
-      // 1. Linha de RESULTADO (dark green) — ( = ) e linhas-resultado chave
+      // ── Classificação semântica ──────────────────────────────────
+      // RESULTADO: linhas ( = ) e resultados-chave (SEM TOTAL RECEITA/DESPESA)
       var isRes = dsc.startsWith('( = )') ||
-                  /TOTAL RECEITA|TOTAL DESPESA/.test(dsc) ||
-                  (dsc.includes('LAIR') && !dsc.startsWith('(')) ||
-                  (dsc.includes('Lucro L') && !dsc.startsWith('(')) ||
-                  dsc.includes('EBITDA') ||
-                  (dsc.includes('Margem') && !dsc.startsWith('('));
+                  (!cod && dsc.includes('LAIR') && dsc.length > 5) ||
+                  (!cod && dsc.includes('Lucro L')) ||
+                  (!cod && dsc.includes('EBITDA')) ||
+                  (!cod && dsc.includes('Margem de'));
 
-      // 2. Linha DESPESA-resumo (sem código, bold, não resultado)
+      // TOTAIS: TOTAL RECEITA / TOTAL DESPESA — bold sem fundo escuro
+      var isTotalLine = !cod && /^TOTAL (RECEITA|DESPESA)/.test(dsc.trim());
+
+      // DESPESA-resumo: linhas "DESPESA: ..."
       var isDespRes = !cod && dsc.startsWith('DESPESA:');
 
-      // 3. Separador de seção — sem código, tudo maiúsculas, não é resultado nem sub
+      // SEPARADOR DE SEÇÃO: apenas strings multi-palavra em maiúsculas
+      // EXCLUINDO itens curtos como FD, PIS, ISS, INSS, ICMS, OUTROS
+      var dscTrim = dsc.trim();
       var isSep = !cod &&
                   !isRes &&
+                  !isTotalLine &&
                   !isDespRes &&
-                  dsc === dsc.toUpperCase() &&
-                  dsc.trim().length > 3 &&
-                  !dsc.startsWith('(');
+                  dscTrim === dscTrim.toUpperCase() &&
+                  dscTrim.indexOf(' ') >= 0 &&      // tem espaço = múltiplas palavras
+                  dscTrim.length > 8 &&              // mais de 8 chars
+                  !dscTrim.startsWith('(');
 
-      // 4. Linha de percentual
-      var isPct = !cod && (dsc.startsWith('%') || dsc.includes('OH %') || dsc.includes('% sobre'));
+      // PERCENTUAL: linhas de % sem código
+      var isPct = !cod && !isRes && (
+        dscTrim.startsWith('%') ||
+        dscTrim.includes('OH %') ||
+        dscTrim.includes('% sobre')
+      );
 
-      // 5. Sublinhas com operador (+)/(-) mas não resultado
-      var isSub = !isRes && (dsc.startsWith('(+)') || dsc.startsWith('(-)') ||
-                             dsc.startsWith('( - )') || dsc.startsWith('( + )'));
+      // SUBLINHAS: ( - ) / ( + ) / (+) / (-)
+      var isSub = !isRes && (
+        dscTrim.startsWith('( - )') || dscTrim.startsWith('( + )') ||
+        dscTrim.startsWith('(-)') || dscTrim.startsWith('(+)')
+      );
 
-      // ── Cor da variação (verde=melhora / vermelho=piora) ──────────
+      // ── Cor da variação ──────────────────────────────────────────
       var isDesp = cod.slice(0,2) === 'B2' ||
-                   dsc.startsWith('DESPESA') ||
-                   dsc.includes('( - ) Custo') ||
-                   dsc.startsWith('(-) ') ||
-                   /\(-\)\s*(IR|CSLL|Imposto|Despesa|Custo|FD)/.test(dsc);
+                   dscTrim.startsWith('DESPESA') ||
+                   /^\( - \)\s*(Custo|Despesa|IR|CSLL|FD|Imposto)/.test(dscTrim) ||
+                   dscTrim.startsWith('(-) ');
       var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var cor = neu ? '#888' : (bad ? '#C0392B' : '#0A7832');
-      var st  = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
+      var corNormal = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');
+      var corEscuro = neu ? 'rgba(255,255,255,0.35)' : (bad ? '#FFAAAA' : '#7FFFD4');
+      var st = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
 
-      // ── Estilo da linha ───────────────────────────────────────────
-      var bg, fc, fw = 'normal', fs = '12px', indent = '';
+      // ── Estilo da linha ──────────────────────────────────────────
+      var bg, fc, fw = 'normal', fs = '12px', indent = '', cor;
 
       if (isRes) {
-        // Resultado: verde escuro, texto branco/dourado
-        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold'; fs = '12px';
-        cor = neu ? 'rgba(255,255,255,0.4)' : (bad ? '#F4A29A' : '#7EECC8');
+        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold';
+        cor = corEscuro;
 
       } else if (isSep) {
-        // Separador de seção: verde médio, texto dourado
-        bg = '#1E524D'; fc = '#F4D19D'; fw = 'bold'; fs = '11px';
-        cor = neu ? 'rgba(244,209,157,0.5)' : (bad ? '#F4A29A' : '#7EECC8');
+        bg = '#1B4D49'; fc = '#F4D19D'; fw = 'bold'; fs = '11px';
+        cor = corEscuro;
+
+      } else if (isTotalLine) {
+        bg = '#FFFFFF'; fc = '#103D39'; fw = 'bold';
+        cor = corNormal;
 
       } else if (isDespRes) {
-        // Linha DESPESA: resumo
-        bg = '#F7F7F7'; fc = '#333'; fw = 'normal'; fs = '12px';
+        bg = '#F5F5F5'; fc = '#444444'; fw = 'normal';
+        cor = corNormal;
 
       } else if (isPct) {
-        // Percentual: verde muito claro, fonte menor
-        bg = '#D6EDE8'; fc = '#103D39'; fw = 'normal'; fs = '11px';
+        bg = '#D4EDE8'; fc = '#103D39'; fs = '11px';
+        cor = corNormal;
 
       } else if (niv === 1) {
-        // Nível B1/B2: verde claro médio, bold
-        bg = '#C8E6E2'; fc = '#103D39'; fw = 'bold'; fs = '12px';
+        bg = '#BFE0DB'; fc = '#103D39'; fw = 'bold';
+        cor = corNormal;
 
       } else if (niv === 2) {
-        // Nível B11/B12: verde claro suave, bold
-        bg = '#DCF0EC'; fc = '#103D39'; fw = 'bold'; fs = '12px';
+        bg = '#D5EDE9'; fc = '#103D39'; fw = 'bold';
+        cor = corNormal;
 
       } else if (niv === 3) {
-        // Nível B111: verde muito claro, bold
-        bg = '#EAF5F2'; fc = '#1A4A46'; fw = 'bold'; fs = '12px';
+        bg = '#E8F5F3'; fc = '#1A4A46'; fw = 'bold';
+        cor = corNormal;
 
       } else if (niv === 4) {
-        // Nível B1111: levemente colorido
-        bg = '#F2FAF8'; fc = '#222'; fw = 'normal'; fs = '12px';
+        bg = '#F2FAF8'; fc = '#222222';
+        cor = corNormal;
 
       } else if (isSub) {
-        // Sublinhas ( - ) / ( + )
-        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5FCFA'; fc = '#333'; fs = '12px';
-        indent = 'padding-left:18px'; zebra++;
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F0FAF8';
+        fc = '#333333'; indent = 'padding-left:18px'; zebra++;
+        cor = corNormal;
 
       } else {
-        // Normal — zebra
-        bg = zebra % 2 === 0 ? '#FFFFFF' : '#EAF4F0'; fc = 'inherit'; fs = '12px';
-        zebra++;
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#EAF4F0';
+        fc = '#222222'; zebra++;
+        cor = corNormal;
       }
 
-      var codColor = (isRes || isSep) ? 'rgba(255,255,255,0.35)' : '#aaa';
+      var codColor = (isRes || isSep) ? 'rgba(255,255,255,0.3)' : '#AAAAAA';
 
-      h += '<tr style="background:'+bg+';color:'+fc+';font-weight:'+fw+';font-size:'+fs+'">' +
-        '<td style="font-size:10px;color:'+codColor+'">'+cod+'</td>' +
-        '<td style="'+indent+'">'+dsc+'</td>' +
-        '<td class="r">'+fNum(it.v1)+'</td>' +
-        '<td class="r">'+fNum(it.v2)+'</td>' +
-        '<td class="r" style="color:'+cor+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>' +
-        '<td class="r" style="color:'+cor+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>' +
-        '<td style="text-align:center;color:'+cor+';font-size:11px;font-weight:700">'+st+'</td></tr>';
+      h += '<tr style="background:' + bg + ';color:' + fc + ' !important;font-weight:' + fw + ';font-size:' + fs + '">' +
+        '<td style="font-size:10px;color:' + codColor + '">' + cod + '</td>' +
+        '<td style="' + indent + ';color:' + fc + ' !important">' + dsc + '</td>' +
+        '<td class="r" style="color:' + fc + ' !important">' + fNum(it.v1) + '</td>' +
+        '<td class="r" style="color:' + fc + ' !important">' + fNum(it.v2) + '</td>' +
+        '<td class="r" style="color:' + cor + ';font-weight:700">' + (neu ? '—' : (it.vr > 0 ? '+' : '') + fNum(it.vr)) + '</td>' +
+        '<td class="r" style="color:' + cor + '">' + (neu ? '—' : (it.vp * 100).toFixed(1) + '%') + '</td>' +
+        '<td style="text-align:center;color:' + cor + ';font-size:11px;font-weight:700">' + st + '</td></tr>';
     });
     document.getElementById('comp-table').innerHTML = h + '</tbody></table></div>';
     showMsg('Comparativo gerado: ' + rows.length + ' itens.', 'ok');

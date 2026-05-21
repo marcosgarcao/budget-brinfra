@@ -160,7 +160,13 @@ input[type=text],input[type=file],select{width:100%;padding:7px 10px;border:0.5p
         <button class="btn btn-green" onclick="gerarComp()">&gt;&gt; Gerar</button>
         <button class="btn btn-dark" onclick="showMeses()" style="font-size:11px;padding:9px 12px">Ver Meses</button>
       </div>
-      <div id="comp-info" style="font-size:11px;color:#888;margin-bottom:8px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:6px">
+        <div id="comp-info" style="font-size:11px;color:#888"></div>
+        <div id="comp-export-btns" style="display:none;gap:8px">
+          <button class="btn btn-dark" onclick="exportXlsx()" style="font-size:11px;padding:6px 14px">⬇ Exportar XLSX</button>
+          <button class="btn btn-dark" onclick="exportPdf()" style="font-size:11px;padding:6px 14px">⬇ Exportar PDF</button>
+        </div>
+      </div>
     </div>
     <div id="comp-table"><div class="empty">Selecione uma obra e configure as revisões para gerar o comparativo.</div></div>
   </div>
@@ -576,88 +582,149 @@ async function gerarComp() {
       return {code:cd,desc:ds,v1:v1,v2:v2,vr:v2-v1,vp:v1!==0?(v2-v1)/Math.abs(v1):0};
     });
 
-    // ── Corta tudo a partir de "COM FATURAMENTO DIRETO" (inclusive) ──
+    // Corta tudo a partir de "COM FATURAMENTO DIRETO" (inclusive)
     var corteIdx = rows.findIndex(function(r) {
       return (r.desc||'').toUpperCase().includes('COM FATURAMENTO DIRETO');
     });
     if (corteIdx >= 0) rows = rows.slice(0, corteIdx);
 
+    // Guarda rows globalmente para exportação
+    window._compRows = rows;
+    window._compRevB = revB;
+    window._compRevA = revA;
+    window._compFil  = fil;
+    window._compObra = OBRA_ATUAL;
+
     document.getElementById('comp-info').innerHTML =
       revB.id + ': ' + revB.mesFechado + ' &nbsp;|&nbsp; ' + revA.id + ': ' + revA.mesFechado +
       ' &nbsp;|&nbsp; Filtro: <b>' + fil + '</b> &nbsp;|&nbsp; ' + rows.length + ' itens';
 
-    var h = '<div class="scroll-x"><table class="tbl"><thead><tr>' +
+    document.getElementById('comp-info').innerHTML =
+      revB.id + ': ' + revB.mesFechado + ' &nbsp;|&nbsp; ' + revA.id + ': ' + revA.mesFechado +
+      ' &nbsp;|&nbsp; Filtro: <b>' + fil + '</b> &nbsp;|&nbsp; ' + rows.length + ' itens';
+
+    // Mostra botões de exportação
+    var expBtns = document.getElementById('comp-export-btns');
+    if (expBtns) expBtns.style.display = 'flex';
+
+    var h = '<div class="scroll-x"><table class="tbl" id="comp-tbl-data"><thead><tr>' +
       '<th style="width:80px">Código</th><th>Descrição</th>' +
       '<th class="r">' + revB.id + '</th><th class="r">' + revA.id + '</th>' +
       '<th class="r">Variação (R$)</th><th class="r">Var %</th>' +
       '<th style="text-align:center">Status</th></tr></thead><tbody>';
 
-    var linhaAlterna = 0; // controla zebra só nas linhas normais
+    var zebra = 0;
     rows.forEach(function(it) {
       var dsc = it.desc || '';
+      var cod = it.code || '';
       var neu = Math.abs(it.vr) < 0.01;
 
-      // ── Classificação da linha ──────────────────────────────────
-      // Totais/Resultados: linhas ( = ) e linhas-chave de resultado
-      var isTot = dsc.startsWith('( = )') ||
-                  dsc.includes('Lucro L') ||
-                  dsc.includes('EBITDA') ||
-                  dsc.includes('LAIR') ||
-                  dsc.includes('TOTAL') ||
-                  dsc.includes('Margem');
+      // ── Nível hierárquico pelo código B ──────────────────────────
+      // niv 0 = sem código | 1 = B1/B2 | 2 = B11 | 3 = B111 | 4 = B1111 | 5 = B11101
+      var niv = 0;
+      if (cod) {
+        if      (cod.length <= 2)  niv = 1;
+        else if (cod.length === 3) niv = 2;
+        else if (cod.length === 4) niv = 3;
+        else if (cod.length === 5) niv = 4;
+        else                       niv = 5;
+      }
 
-      // Separadores de seção: texto em maiúsculas sem código (ex: FLUXO DE CAIXA)
-      var isSep = !it.code &&
+      // ── Classificação semântica ───────────────────────────────────
+      // 1. Linha de RESULTADO (dark green) — ( = ) e linhas-resultado chave
+      var isRes = dsc.startsWith('( = )') ||
+                  /TOTAL RECEITA|TOTAL DESPESA/.test(dsc) ||
+                  (dsc.includes('LAIR') && !dsc.startsWith('(')) ||
+                  (dsc.includes('Lucro L') && !dsc.startsWith('(')) ||
+                  dsc.includes('EBITDA') ||
+                  (dsc.includes('Margem') && !dsc.startsWith('('));
+
+      // 2. Linha DESPESA-resumo (sem código, bold, não resultado)
+      var isDespRes = !cod && dsc.startsWith('DESPESA:');
+
+      // 3. Separador de seção — sem código, tudo maiúsculas, não é resultado nem sub
+      var isSep = !cod &&
+                  !isRes &&
+                  !isDespRes &&
                   dsc === dsc.toUpperCase() &&
                   dsc.trim().length > 3 &&
                   !dsc.startsWith('(');
 
-      // Linhas de percentual (%, OH, etc.)
-      var isPct = dsc.startsWith('%') || dsc.includes('OH %') || dsc.includes('% sobre');
+      // 4. Linha de percentual
+      var isPct = !cod && (dsc.startsWith('%') || dsc.includes('OH %') || dsc.includes('% sobre'));
 
-      // Sublinhas indentadas: começam com (+), (-) mas NÃO são totais
-      var isSub = !isTot && (dsc.startsWith('(+)') || dsc.startsWith('(-)') || dsc.startsWith('( - )') || dsc.startsWith('( + )'));
+      // 5. Sublinhas com operador (+)/(-) mas não resultado
+      var isSub = !isRes && (dsc.startsWith('(+)') || dsc.startsWith('(-)') ||
+                             dsc.startsWith('( - )') || dsc.startsWith('( + )'));
 
-      // ── Cor da variação: depesas pioram com aumento ──────────────
-      var isDesp = (it.code && it.code.slice(0,2) === 'B2') ||
-                   dsc.startsWith('(-)') || dsc.startsWith('( - )') ||
-                   dsc.includes('Custo') || dsc.includes('Despesa') ||
-                   dsc.includes('Imposto') || dsc.includes('(-) IR') || dsc.includes('(-) CSLL');
+      // ── Cor da variação (verde=melhora / vermelho=piora) ──────────
+      var isDesp = cod.slice(0,2) === 'B2' ||
+                   dsc.startsWith('DESPESA') ||
+                   dsc.includes('( - ) Custo') ||
+                   dsc.startsWith('(-) ') ||
+                   /\(-\)\s*(IR|CSLL|Imposto|Despesa|Custo|FD)/.test(dsc);
       var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var cor = neu ? '#888' : (bad ? '#B41E1E' : '#0A7832');
+      var cor = neu ? '#888' : (bad ? '#C0392B' : '#0A7832');
       var st  = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
 
-      // ── Estilo da linha ──────────────────────────────────────────
-      var bg, fc, fw = 'normal', fs = '13px';
-      if (isTot) {
-        // Verde escuro — mesmo padrão das linhas de resultado do PDF
-        bg = '#103D39'; fc = '#fff'; fw = 'bold';
+      // ── Estilo da linha ───────────────────────────────────────────
+      var bg, fc, fw = 'normal', fs = '12px', indent = '';
+
+      if (isRes) {
+        // Resultado: verde escuro, texto branco/dourado
+        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold'; fs = '12px';
+        cor = neu ? 'rgba(255,255,255,0.4)' : (bad ? '#F4A29A' : '#7EECC8');
+
       } else if (isSep) {
-        // Separador de seção — cinza médio
-        bg = '#2A5651'; fc = '#F4D19D'; fw = 'bold';
+        // Separador de seção: verde médio, texto dourado
+        bg = '#1E524D'; fc = '#F4D19D'; fw = 'bold'; fs = '11px';
+        cor = neu ? 'rgba(244,209,157,0.5)' : (bad ? '#F4A29A' : '#7EECC8');
+
+      } else if (isDespRes) {
+        // Linha DESPESA: resumo
+        bg = '#F7F7F7'; fc = '#333'; fw = 'normal'; fs = '12px';
+
       } else if (isPct) {
-        // Linha de percentual — verde bem claro, itálico
-        bg = '#D4EDE8'; fc = '#103D39'; fw = 'normal'; fs = '12px';
+        // Percentual: verde muito claro, fonte menor
+        bg = '#D6EDE8'; fc = '#103D39'; fw = 'normal'; fs = '11px';
+
+      } else if (niv === 1) {
+        // Nível B1/B2: verde claro médio, bold
+        bg = '#C8E6E2'; fc = '#103D39'; fw = 'bold'; fs = '12px';
+
+      } else if (niv === 2) {
+        // Nível B11/B12: verde claro suave, bold
+        bg = '#DCF0EC'; fc = '#103D39'; fw = 'bold'; fs = '12px';
+
+      } else if (niv === 3) {
+        // Nível B111: verde muito claro, bold
+        bg = '#EAF5F2'; fc = '#1A4A46'; fw = 'bold'; fs = '12px';
+
+      } else if (niv === 4) {
+        // Nível B1111: levemente colorido
+        bg = '#F2FAF8'; fc = '#222'; fw = 'normal'; fs = '12px';
+
       } else if (isSub) {
-        // Sublinha indentada
-        bg = '#F5FCF9'; fc = '#444';
+        // Sublinhas ( - ) / ( + )
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5FCFA'; fc = '#333'; fs = '12px';
+        indent = 'padding-left:18px'; zebra++;
+
       } else {
         // Normal — zebra
-        bg = linhaAlterna % 2 === 0 ? '#fff' : '#EAF4F0'; fc = 'inherit';
-        linhaAlterna++;
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#EAF4F0'; fc = 'inherit'; fs = '12px';
+        zebra++;
       }
 
-      var vc = isTot ? '#F4D19D' : (isSep ? '#F4D19D' : cor);
-      var indent = isSub ? 'padding-left:20px' : '';
+      var codColor = (isRes || isSep) ? 'rgba(255,255,255,0.35)' : '#aaa';
 
       h += '<tr style="background:'+bg+';color:'+fc+';font-weight:'+fw+';font-size:'+fs+'">' +
-        '<td style="font-size:11px;color:'+(isTot||isSep?'rgba(255,255,255,0.5)':'inherit')+'">'+it.code+'</td>' +
+        '<td style="font-size:10px;color:'+codColor+'">'+cod+'</td>' +
         '<td style="'+indent+'">'+dsc+'</td>' +
         '<td class="r">'+fNum(it.v1)+'</td>' +
         '<td class="r">'+fNum(it.v2)+'</td>' +
-        '<td class="r" style="color:'+vc+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>' +
-        '<td class="r" style="color:'+vc+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>' +
-        '<td style="text-align:center;color:'+vc+';font-size:11px;font-weight:700">'+st+'</td></tr>';
+        '<td class="r" style="color:'+cor+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>' +
+        '<td class="r" style="color:'+cor+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>' +
+        '<td style="text-align:center;color:'+cor+';font-size:11px;font-weight:700">'+st+'</td></tr>';
     });
     document.getElementById('comp-table').innerHTML = h + '</tbody></table></div>';
     showMsg('Comparativo gerado: ' + rows.length + ' itens.', 'ok');
@@ -684,6 +751,81 @@ function renderInsights() {
   REVS.forEach(function(r) { h += '<td class="ins-subval">' + new Date(r.date).toLocaleDateString('pt-BR') + '</td>'; });
   el.innerHTML = h + '</tr></tbody></table></div>';
 }
+// ═══ EXPORTAR XLSX ═══
+function exportXlsx() {
+  var rows = window._compRows;
+  var revB = window._compRevB;
+  var revA = window._compRevA;
+  if (!rows || !revB) { showMsg('Gere o comparativo primeiro.', 'err'); return; }
+
+  var data = [
+    ['Obra', window._compObra],
+    ['Revisão Base', revB.id + ' — ' + revB.mesFechado],
+    ['Revisão Atual', revA.id + ' — ' + revA.mesFechado],
+    ['Filtro', window._compFil],
+    [],
+    ['Código', 'Descrição', revB.id + ' (R$)', revA.id + ' (R$)', 'Variação (R$)', 'Var %', 'Status']
+  ];
+
+  rows.forEach(function(it) {
+    var neu = Math.abs(it.vr) < 0.01;
+    data.push([
+      it.code || '',
+      it.desc || '',
+      it.v1 || 0,
+      it.v2 || 0,
+      it.vr || 0,
+      neu ? 0 : parseFloat((it.vp * 100).toFixed(2)),
+      neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução')
+    ]);
+  });
+
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Larguras das colunas
+  ws['!cols'] = [
+    { wch: 10 }, { wch: 55 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 14 }
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Comparativo');
+  var nome = 'Comparativo_' + window._compObra.replace(/[^a-zA-Z0-9]/g,'_') +
+             '_' + revB.id + '_vs_' + revA.id + '.xlsx';
+  XLSX.writeFile(wb, nome);
+  showMsg('Exportado: ' + nome, 'ok');
+}
+
+// ═══ EXPORTAR PDF ═══
+function exportPdf() {
+  var revB = window._compRevB;
+  var revA = window._compRevA;
+  if (!revB) { showMsg('Gere o comparativo primeiro.', 'err'); return; }
+
+  var tbl = document.getElementById('comp-tbl-data');
+  if (!tbl) { showMsg('Tabela não encontrada.', 'err'); return; }
+
+  var win = window.open('', '_blank');
+  win.document.write('<html><head><title>Comparativo ' + revB.id + ' vs ' + revA.id + '</title>');
+  win.document.write('<style>');
+  win.document.write('body{font-family:Calibri,sans-serif;font-size:11px;margin:20px}');
+  win.document.write('h2{color:#103D39;font-size:14px;margin-bottom:4px}');
+  win.document.write('p{color:#666;font-size:10px;margin-bottom:12px}');
+  win.document.write('table{width:100%;border-collapse:collapse;font-size:10px}');
+  win.document.write('th{background:#103D39;color:#fff;padding:5px 8px;text-align:left;white-space:nowrap}');
+  win.document.write('th.r,td.r{text-align:right}');
+  win.document.write('td{padding:4px 8px;border-bottom:0.5px solid #ddd}');
+  win.document.write('@media print{body{margin:10px}@page{size:A4 landscape;margin:15mm}}');
+  win.document.write('</style></head><body>');
+  win.document.write('<h2>BR Infra — Comparativo de Revisões</h2>');
+  win.document.write('<p>Obra: <b>' + window._compObra + '</b> &nbsp;|&nbsp; ' +
+    revB.id + ': ' + revB.mesFechado + ' &nbsp;vs&nbsp; ' +
+    revA.id + ': ' + revA.mesFechado + ' &nbsp;|&nbsp; Filtro: ' + window._compFil + '</p>');
+  win.document.write(tbl.outerHTML);
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(function() { win.print(); }, 400);
+}
+
 </script>
 </body>
 </html>

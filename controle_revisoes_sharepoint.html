@@ -628,62 +628,116 @@ async function gerarComp() {
     var SEM_Z0 = '#FFFFFF';   // sem código zebra par
     var SEM_Z1 = '#EBF7F5';   // sem código zebra ímpar
 
+    // ═══════════════════════════════════════════════════════════
+    // PALETA FIEL AO EXCEL DE REFERÊNCIA
+    // ═══════════════════════════════════════════════════════════
+    // B-code hierarchy (Image 1):
+    //   len 1-2 (B1,B2)  → VERMELHO  #FF0000  texto branco
+    //   len 3   (B11...)  → AMARELO   #FFFF00  texto preto
+    //   len 4   (B111...) → BRANCO    #FFFFFF  bold preto
+    //   len 5   (B1111..) → CINZA CLR #F2F2F2  normal preto
+    //   len 6+            → zebra     #FFF / #F5F5F5
+    //
+    // Resultados sem código (Image 2):
+    //   TOTAL RECEITA/DESPESA / Receita Bruta → VERMELHO  #FF0000  preto bold
+    //   DESPESA: linhas                        → CINZA     #808080  branco
+    //   LAIR header / Lucro Depois             → VERDE     #00B050  branco bold
+    //   ( = ) Margem / EBITDA / LAIR ( = )    → ESCURO    #1F1F1F  branco bold
+    //   ( = ) Lucro Líquido / s/OH             → VERDE     #00B050  branco bold
+    //   Receita Líquida (RL)                   → AMARELO   #FFFF00  preto bold
+    //   % rows                                 → VERDE CLR #D9F0E5  preto
+    //   FLUXO DE CAIXA                         → BRANCO    bold
+    //   detalhe normal                         → zebra branco/#F5F5F5
+
     var zebra = 0;
     rows.forEach(function(it) {
       var dsc = it.desc ? it.desc.trim() : '';
       var cod = it.code ? it.code.trim() : '';
       var neu = Math.abs(it.vr) < 0.01;
-      var niv = cod.length; // 0=sem código, 1=B1, 3=B11, 4=B111, 5=B1111, 6=B11101
+      var niv = cod.length;
 
-      // ── Linhas especiais (sem código) ─────────────────────────────
-      var isRes   = !cod && (dsc.startsWith('( = )') || /^LAIR\b/.test(dsc) || dsc === 'FLUXO DE CAIXA');
-      var isTotal = !cod && /^TOTAL (RECEITA|DESPESA)/.test(dsc);
-      var isDespR = !cod && dsc.startsWith('DESPESA:');
-      var isPct   = !cod && !isRes && (dsc.startsWith('%') || /OH %|% sobre/.test(dsc));
+      // ── Classificação das linhas SEM código ─────────────────
+      var isRes_escuro = !cod && (
+        /^\( = \)\s*(Margem|EBITDA)/.test(dsc) ||
+        /^\( = \)\s*LAIR/.test(dsc)
+      );
+      var isRes_verde = !cod && (
+        /^\( = \)\s*(Lucro|Margem de C)/.test(dsc) ||
+        /^LAIR\b/.test(dsc) ||
+        /^Lucro Depois/.test(dsc) ||
+        /^\( = \)\s*Lucro/.test(dsc)
+      );
+      var isRes_verde_pct = !cod && !isRes_verde && !isRes_escuro && (
+        dsc.startsWith('%') || /OH %|% sobre/.test(dsc)
+      );
+      var isTotalRed = !cod && (
+        /^TOTAL (RECEITA|DESPESA)/.test(dsc) ||
+        /^Receita Bruta/.test(dsc)
+      );
+      var isRlAmarelo = !cod && /^Receita L.?quida/.test(dsc);
+      var isDespGray  = !cod && dsc.startsWith('DESPESA:');
+      var isFluxo     = !cod && dsc === 'FLUXO DE CAIXA';
+      var isDetalheNC = !cod && !isRes_escuro && !isRes_verde && !isRes_verde_pct &&
+                        !isTotalRed && !isRlAmarelo && !isDespGray && !isFluxo;
 
-      // ── Cor da variação ───────────────────────────────────────────
+      // ── Cor da variação ─────────────────────────────────────
       var isDesp = (cod && cod.slice(0,2) === 'B2') ||
                    /^DESPESA/.test(dsc) ||
                    /^\( - \)\s*(Custo|Despesa|IR|CSLL|FD|Deprecia|Imposto)/.test(dsc);
-      var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var corC = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');
-      var corE = neu ? 'rgba(255,255,255,0.35)' : (bad ? '#FFAAAA' : '#6DECBE');
+      var bad  = isDesp ? (it.vr > 0) : (it.vr < 0);
+      var corC = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');   // fundo claro
+      var corB = neu ? 'rgba(255,255,255,0.5)' : (bad ? '#FFAAAA' : '#80FFB0'); // fundo escuro
+      var corY = neu ? '#888888' : (bad ? '#8B0000' : '#005A1F');   // fundo amarelo
       var st   = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
 
-      // ── Estilo ────────────────────────────────────────────────────
       var bg, fc, fw, fs = '12px', cor, codCol = '#AAAAAA', indent = '';
 
-      if (isRes) {
-        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold'; cor = corE;
-        codCol = 'rgba(255,255,255,0.2)';
-
-      } else if (isTotal) {
-        bg = '#FFFFFF'; fc = '#103D39'; fw = 'bold'; cor = corC;
-
-      } else if (isDespR) {
-        bg = '#F6F6F6'; fc = '#555555'; fw = 'normal'; cor = corC;
-
-      } else if (isPct) {
-        bg = '#D9EDE9'; fc = '#103D39'; fw = 'normal'; fs = '11px'; cor = corC;
-
-      } else if (cod && niv <= 5) {
-        // ── GRUPOS B-code (niv 1-4): COR FIXA, SEM ZEBRA ──────────
-        // niv 1 = len 1-2 | niv 2 = len 3 | niv 3 = len 4 | niv 4 = len 5
-        var grpNiv = niv <= 2 ? 1 : niv === 3 ? 2 : niv === 4 ? 3 : 4;
-        bg = NIV_BG[grpNiv];
-        fc = NIV_FC; fw = 'bold'; cor = corC;
-        codCol = '#5A9490';
-
-      } else {
-        // ── DETALHE (niv 6+) e linhas sem código: ZEBRA SIMPLES ────
-        if (cod) {
-          bg = zebra % 2 === 0 ? DET_Z0 : DET_Z1;
-          fc = DET_FC;
+      // ── LINHAS COM CÓDIGO B ──────────────────────────────────
+      if (cod) {
+        if (niv <= 2) {
+          // B1, B2 → VERMELHO
+          bg = '#FF0000'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'rgba(255,255,255,0.6)';
+        } else if (niv === 3) {
+          // B11, B12... → AMARELO
+          bg = '#FFFF00'; fc = '#000000'; fw = 'bold'; cor = corY; codCol = '#666600';
+        } else if (niv === 4) {
+          // B111... → BRANCO, bold
+          bg = '#FFFFFF'; fc = '#000000'; fw = 'bold'; cor = corC;
+        } else if (niv === 5) {
+          // B1111... → CINZA CLARO
+          bg = '#F2F2F2'; fc = '#222222'; fw = 'normal'; cor = corC;
         } else {
-          bg = zebra % 2 === 0 ? SEM_Z0 : SEM_Z1;
-          fc = DET_FC;
+          // B11101+ → ZEBRA
+          bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5F5F5';
+          fc = '#222222'; fw = 'normal'; cor = corC; zebra++;
         }
-        fw = 'normal'; cor = corC; zebra++;
+
+      // ── LINHAS SEM CÓDIGO ────────────────────────────────────
+      } else if (isRes_escuro) {
+        // ( = ) Margem / EBITDA / LAIR → ESCURO
+        bg = '#1F1F1F'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'transparent';
+      } else if (isRes_verde) {
+        // LAIR header / Lucro Depois / ( = ) Lucro Líquido → VERDE
+        bg = '#00B050'; fc = '#FFFFFF'; fw = 'bold'; cor = corB; codCol = 'transparent';
+      } else if (isRes_verde_pct) {
+        // % linhas → VERDE CLARO
+        bg = '#D9F0E5'; fc = '#00522A'; fw = 'normal'; fs = '11px'; cor = corY;
+      } else if (isTotalRed) {
+        // TOTAL RECEITA / TOTAL DESPESA / Receita Bruta → VERMELHO
+        bg = '#FF0000'; fc = '#000000'; fw = 'bold'; cor = corB;
+      } else if (isRlAmarelo) {
+        // Receita Líquida (RL) → AMARELO
+        bg = '#FFFF00'; fc = '#000000'; fw = 'bold'; cor = corY;
+      } else if (isDespGray) {
+        // DESPESA: → CINZA
+        bg = '#808080'; fc = '#FFFFFF'; fw = 'normal'; cor = corB;
+      } else if (isFluxo) {
+        // FLUXO DE CAIXA → branco bold
+        bg = '#FFFFFF'; fc = '#000000'; fw = 'bold'; cor = corC;
+      } else {
+        // Detalhe normal → ZEBRA
+        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F5F5F5';
+        fc = '#222222'; fw = 'normal'; cor = corC; zebra++;
         if (/^\( [-+] \)/.test(dsc)) indent = 'padding-left:16px';
       }
 

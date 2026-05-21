@@ -740,14 +740,16 @@ async function gerarComp() {
         }
       }
 
-      h += '<tr style="background:' + bg + ';font-size:' + fs + ';font-weight:' + fw + '">' +
-        '<td style="font-size:10px;color:' + (isVerde ? 'rgba(255,255,255,0.4)' : '#AAAAAA') + ';font-weight:normal">' + cod + '</td>' +
-        '<td style="color:' + fc + ';' + indent + '">' + dsc + '</td>' +
-        '<td class="r" style="color:' + fc + '">' + fNum(it.v1) + '</td>' +
-        '<td class="r" style="color:' + fc + '">' + fNum(it.v2) + '</td>' +
-        '<td class="r" style="color:' + cor + ';font-weight:700">' + (neu ? '—' : (it.vr > 0 ? '+' : '') + fNum(it.vr)) + '</td>' +
-        '<td class="r" style="color:' + cor + '">' + (neu ? '—' : (it.vp * 100).toFixed(1) + '%') + '</td>' +
-        '<td style="text-align:center;color:' + cor + ';font-size:11px;font-weight:700">' + st + '</td></tr>';
+      // Aplica background em cada td para sobrescrever CSS nth-child
+      var tdBg = 'background:' + bg + ';';
+      h += '<tr style="font-size:' + fs + ';font-weight:' + fw + '">' +
+        '<td style="' + tdBg + 'font-size:10px;color:' + (isVerde ? 'rgba(255,255,255,0.4)' : '#AAAAAA') + ';font-weight:normal">' + cod + '</td>' +
+        '<td style="' + tdBg + 'color:' + fc + ';' + indent + '">' + dsc + '</td>' +
+        '<td class="r" style="' + tdBg + 'color:' + fc + '">' + fNum(it.v1) + '</td>' +
+        '<td class="r" style="' + tdBg + 'color:' + fc + '">' + fNum(it.v2) + '</td>' +
+        '<td class="r" style="' + tdBg + 'color:' + cor + ';font-weight:700">' + (neu ? '—' : (it.vr > 0 ? '+' : '') + fNum(it.vr)) + '</td>' +
+        '<td class="r" style="' + tdBg + 'color:' + cor + '">' + (neu ? '—' : (it.vp * 100).toFixed(1) + '%') + '</td>' +
+        '<td style="' + tdBg + 'text-align:center;color:' + cor + ';font-size:11px;font-weight:700">' + st + '</td></tr>';
     });
     document.getElementById('comp-table').innerHTML = h + '</tbody></table></div>';
     showMsg('Comparativo gerado: ' + rows.length + ' itens.', 'ok');

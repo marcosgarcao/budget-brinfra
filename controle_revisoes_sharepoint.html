@@ -576,6 +576,12 @@ async function gerarComp() {
       return {code:cd,desc:ds,v1:v1,v2:v2,vr:v2-v1,vp:v1!==0?(v2-v1)/Math.abs(v1):0};
     });
 
+    // ── Corta tudo a partir de "COM FATURAMENTO DIRETO" (inclusive) ──
+    var corteIdx = rows.findIndex(function(r) {
+      return (r.desc||'').toUpperCase().includes('COM FATURAMENTO DIRETO');
+    });
+    if (corteIdx >= 0) rows = rows.slice(0, corteIdx);
+
     document.getElementById('comp-info').innerHTML =
       revB.id + ': ' + revB.mesFechado + ' &nbsp;|&nbsp; ' + revA.id + ': ' + revA.mesFechado +
       ' &nbsp;|&nbsp; Filtro: <b>' + fil + '</b> &nbsp;|&nbsp; ' + rows.length + ' itens';
@@ -586,30 +592,72 @@ async function gerarComp() {
       '<th class="r">Variação (R$)</th><th class="r">Var %</th>' +
       '<th style="text-align:center">Status</th></tr></thead><tbody>';
 
-    rows.forEach(function(it, i) {
-      var isDesp=(it.code&&it.code.slice(0,2)==='B2')||(!it.code&&it.desc.startsWith('(-)'));
-      var bad=isDesp?(it.vr>0):(it.vr<0), neu=Math.abs(it.vr)<0.01;
-      var cor=neu?'#888':(bad?'#B41E1E':'#0A7832');
-      var st=neu?'Igual':(it.vr>0?'(+) Aumento':'(-) Redução');
-      var dsc=it.desc||'';
-      var niv=!it.code?0:it.code.length<=2?1:it.code.length===3?2:it.code.length===4?3:4;
-      var isTot=(niv===1)||(dsc.startsWith('( = )')||dsc.includes('Lucro L')||dsc.includes('EBITDA')||dsc.includes('LAIR'));
-      var isSep=!it.code&&dsc===dsc.toUpperCase()&&dsc.includes(' ')&&dsc.length>5;
-      var bg,fc,fw='normal';
-      if(isTot){bg='#103D39';fc='#fff';fw='bold';}
-      else if(niv===2){bg='#EAF4F0';fc='#103D39';fw='bold';}
-      else if(niv===3){bg='#F5FCF9';fw='bold';fc='inherit';}
-      else if(isSep){bg='#C8D2CD';fc='#103D39';fw='bold';}
-      else{bg=i%2===0?'#fff':'#EAF4F0';fc='inherit';}
-      var vc=isTot?'#F4D19D':cor;
-      h+='<tr style="background:'+bg+';color:'+fc+';font-weight:'+fw+'">'+
-        '<td style="font-size:11px">'+it.code+'</td>'+
-        '<td style="'+(it.code===''&&dsc.startsWith('(')?'padding-left:20px':'')+'">'+ dsc+'</td>'+
-        '<td class="r">'+fNum(it.v1)+'</td>'+
-        '<td class="r">'+fNum(it.v2)+'</td>'+
-        '<td class="r" style="color:'+vc+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>'+
-        '<td class="r" style="color:'+vc+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>'+
-        '<td style="text-align:center;color:'+(isTot?'#F4D19D':cor)+';font-size:11px;font-weight:700">'+st+'</td></tr>';
+    var linhaAlterna = 0; // controla zebra só nas linhas normais
+    rows.forEach(function(it) {
+      var dsc = it.desc || '';
+      var neu = Math.abs(it.vr) < 0.01;
+
+      // ── Classificação da linha ──────────────────────────────────
+      // Totais/Resultados: linhas ( = ) e linhas-chave de resultado
+      var isTot = dsc.startsWith('( = )') ||
+                  dsc.includes('Lucro L') ||
+                  dsc.includes('EBITDA') ||
+                  dsc.includes('LAIR') ||
+                  dsc.includes('TOTAL') ||
+                  dsc.includes('Margem');
+
+      // Separadores de seção: texto em maiúsculas sem código (ex: FLUXO DE CAIXA)
+      var isSep = !it.code &&
+                  dsc === dsc.toUpperCase() &&
+                  dsc.trim().length > 3 &&
+                  !dsc.startsWith('(');
+
+      // Linhas de percentual (%, OH, etc.)
+      var isPct = dsc.startsWith('%') || dsc.includes('OH %') || dsc.includes('% sobre');
+
+      // Sublinhas indentadas: começam com (+), (-) mas NÃO são totais
+      var isSub = !isTot && (dsc.startsWith('(+)') || dsc.startsWith('(-)') || dsc.startsWith('( - )') || dsc.startsWith('( + )'));
+
+      // ── Cor da variação: depesas pioram com aumento ──────────────
+      var isDesp = (it.code && it.code.slice(0,2) === 'B2') ||
+                   dsc.startsWith('(-)') || dsc.startsWith('( - )') ||
+                   dsc.includes('Custo') || dsc.includes('Despesa') ||
+                   dsc.includes('Imposto') || dsc.includes('(-) IR') || dsc.includes('(-) CSLL');
+      var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
+      var cor = neu ? '#888' : (bad ? '#B41E1E' : '#0A7832');
+      var st  = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
+
+      // ── Estilo da linha ──────────────────────────────────────────
+      var bg, fc, fw = 'normal', fs = '13px';
+      if (isTot) {
+        // Verde escuro — mesmo padrão das linhas de resultado do PDF
+        bg = '#103D39'; fc = '#fff'; fw = 'bold';
+      } else if (isSep) {
+        // Separador de seção — cinza médio
+        bg = '#2A5651'; fc = '#F4D19D'; fw = 'bold';
+      } else if (isPct) {
+        // Linha de percentual — verde bem claro, itálico
+        bg = '#D4EDE8'; fc = '#103D39'; fw = 'normal'; fs = '12px';
+      } else if (isSub) {
+        // Sublinha indentada
+        bg = '#F5FCF9'; fc = '#444';
+      } else {
+        // Normal — zebra
+        bg = linhaAlterna % 2 === 0 ? '#fff' : '#EAF4F0'; fc = 'inherit';
+        linhaAlterna++;
+      }
+
+      var vc = isTot ? '#F4D19D' : (isSep ? '#F4D19D' : cor);
+      var indent = isSub ? 'padding-left:20px' : '';
+
+      h += '<tr style="background:'+bg+';color:'+fc+';font-weight:'+fw+';font-size:'+fs+'">' +
+        '<td style="font-size:11px;color:'+(isTot||isSep?'rgba(255,255,255,0.5)':'inherit')+'">'+it.code+'</td>' +
+        '<td style="'+indent+'">'+dsc+'</td>' +
+        '<td class="r">'+fNum(it.v1)+'</td>' +
+        '<td class="r">'+fNum(it.v2)+'</td>' +
+        '<td class="r" style="color:'+vc+';font-weight:700">'+(neu?'—':(it.vr>0?'+':'')+fNum(it.vr))+'</td>' +
+        '<td class="r" style="color:'+vc+'">'+(neu?'—':(it.vp*100).toFixed(1)+'%')+'</td>' +
+        '<td style="text-align:center;color:'+vc+';font-size:11px;font-weight:700">'+st+'</td></tr>';
     });
     document.getElementById('comp-table').innerHTML = h + '</tbody></table></div>';
     showMsg('Comparativo gerado: ' + rows.length + ' itens.', 'ok');

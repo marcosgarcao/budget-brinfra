@@ -615,126 +615,77 @@ async function gerarComp() {
 
     var zebra = 0;
     rows.forEach(function(it) {
-      var dsc = it.desc || '';
-      var cod = it.code || '';
+      var dsc = it.desc ? it.desc.trim() : '';
+      var cod = it.code ? it.code.trim() : '';
       var neu = Math.abs(it.vr) < 0.01;
 
-      // ── Nível hierárquico pelo código B ─────────────────────────
-      var niv = 0;
-      if (cod) {
-        if      (cod.length <= 2)  niv = 1;
-        else if (cod.length === 3) niv = 2;
-        else if (cod.length === 4) niv = 3;
-        else if (cod.length === 5) niv = 4;
-        else                       niv = 5;
-      }
+      // Nível pelo comprimento do código
+      // B1=1  B11=2  B111=3  B1111=4  B11101=5  B111011=6
+      var niv = cod.length;
 
-      // ── Classificação semântica ──────────────────────────────────
-      // RESULTADO: linhas ( = ) e resultados-chave (SEM TOTAL RECEITA/DESPESA)
-      var isRes = dsc.startsWith('( = )') ||
-                  (!cod && dsc.includes('LAIR') && dsc.length > 5) ||
-                  (!cod && dsc.includes('Lucro L')) ||
-                  (!cod && dsc.includes('EBITDA')) ||
-                  (!cod && dsc.includes('Margem de'));
+      // ── Classificação semântica (apenas linhas SEM código) ─────
+      var isRes   = !cod && (dsc.startsWith('( = )') || /^LAIR\b/.test(dsc) || dsc === 'FLUXO DE CAIXA');
+      var isTotal = !cod && /^TOTAL (RECEITA|DESPESA)/.test(dsc);
+      var isDespR = !cod && dsc.startsWith('DESPESA:');
+      var isPct   = !cod && !isRes && (dsc.startsWith('%') || /OH %|% sobre/.test(dsc));
 
-      // TOTAIS: TOTAL RECEITA / TOTAL DESPESA — bold sem fundo escuro
-      var isTotalLine = !cod && /^TOTAL (RECEITA|DESPESA)/.test(dsc.trim());
-
-      // DESPESA-resumo: linhas "DESPESA: ..."
-      var isDespRes = !cod && dsc.startsWith('DESPESA:');
-
-      // SEPARADOR DE SEÇÃO: apenas strings multi-palavra em maiúsculas
-      // EXCLUINDO itens curtos como FD, PIS, ISS, INSS, ICMS, OUTROS
-      var dscTrim = dsc.trim();
-      var isSep = !cod &&
-                  !isRes &&
-                  !isTotalLine &&
-                  !isDespRes &&
-                  dscTrim === dscTrim.toUpperCase() &&
-                  dscTrim.indexOf(' ') >= 0 &&      // tem espaço = múltiplas palavras
-                  dscTrim.length > 8 &&              // mais de 8 chars
-                  !dscTrim.startsWith('(');
-
-      // PERCENTUAL: linhas de % sem código
-      var isPct = !cod && !isRes && (
-        dscTrim.startsWith('%') ||
-        dscTrim.includes('OH %') ||
-        dscTrim.includes('% sobre')
-      );
-
-      // SUBLINHAS: ( - ) / ( + ) / (+) / (-)
-      var isSub = !isRes && (
-        dscTrim.startsWith('( - )') || dscTrim.startsWith('( + )') ||
-        dscTrim.startsWith('(-)') || dscTrim.startsWith('(+)')
-      );
-
-      // ── Cor da variação ──────────────────────────────────────────
-      var isDesp = cod.slice(0,2) === 'B2' ||
-                   dscTrim.startsWith('DESPESA') ||
-                   /^\( - \)\s*(Custo|Despesa|IR|CSLL|FD|Imposto)/.test(dscTrim) ||
-                   dscTrim.startsWith('(-) ');
+      // ── Cor da variação ────────────────────────────────────────
+      var isDesp = (cod && cod.slice(0,2) === 'B2') ||
+                   /^DESPESA/.test(dsc) ||
+                   /^\( - \)\s*(Custo|Despesa|IR|CSLL|FD|Deprecia|Imposto)/.test(dsc);
       var bad = isDesp ? (it.vr > 0) : (it.vr < 0);
-      var corNormal = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');
-      var corEscuro = neu ? 'rgba(255,255,255,0.35)' : (bad ? '#FFAAAA' : '#7FFFD4');
-      var st = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
+      var corC = neu ? '#888888' : (bad ? '#C0392B' : '#0A7832');  // fundo claro
+      var corE = neu ? 'rgba(255,255,255,0.35)' : (bad ? '#FFAAAA' : '#7FFFD4'); // fundo escuro
+      var st   = neu ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução');
 
-      // ── Estilo da linha ──────────────────────────────────────────
-      var bg, fc, fw = 'normal', fs = '12px', indent = '', cor;
+      // ── Estilo ────────────────────────────────────────────────
+      var bg, fc, fw, fs = '12px', cor, codCol = '#AAAAAA', indent = '';
 
       if (isRes) {
-        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold';
-        cor = corEscuro;
+        // ★ RESULTADO — verde escuro, texto branco
+        bg = '#103D39'; fc = '#FFFFFF'; fw = 'bold'; cor = corE;
+        codCol = 'rgba(255,255,255,0.2)';
 
-      } else if (isSep) {
-        bg = '#1B4D49'; fc = '#F4D19D'; fw = 'bold'; fs = '11px';
-        cor = corEscuro;
+      } else if (isTotal) {
+        // ★ TOTAL RECEITA / TOTAL DESPESA — branco + bold escuro
+        bg = '#FFFFFF'; fc = '#103D39'; fw = 'bold'; cor = corC;
 
-      } else if (isTotalLine) {
-        bg = '#FFFFFF'; fc = '#103D39'; fw = 'bold';
-        cor = corNormal;
-
-      } else if (isDespRes) {
-        bg = '#F5F5F5'; fc = '#444444'; fw = 'normal';
-        cor = corNormal;
+      } else if (isDespR) {
+        // DESPESA: resumo — cinza muito claro
+        bg = '#F6F6F6'; fc = '#555555'; fw = 'normal'; cor = corC;
 
       } else if (isPct) {
-        bg = '#D4EDE8'; fc = '#103D39'; fs = '11px';
-        cor = corNormal;
+        // % percentual — verde pálido
+        bg = '#D9EDE9'; fc = '#103D39'; fw = 'normal'; fs = '11px'; cor = corC;
 
-      } else if (niv === 1) {
-        bg = '#BFE0DB'; fc = '#103D39'; fw = 'bold';
-        cor = corNormal;
-
-      } else if (niv === 2) {
-        bg = '#D5EDE9'; fc = '#103D39'; fw = 'bold';
-        cor = corNormal;
-
-      } else if (niv === 3) {
-        bg = '#E8F5F3'; fc = '#1A4A46'; fw = 'bold';
-        cor = corNormal;
-
-      } else if (niv === 4) {
-        bg = '#F2FAF8'; fc = '#222222';
-        cor = corNormal;
-
-      } else if (isSub) {
-        bg = zebra % 2 === 0 ? '#FFFFFF' : '#F0FAF8';
-        fc = '#333333'; indent = 'padding-left:18px'; zebra++;
-        cor = corNormal;
+      } else if (cod) {
+        // ── LINHAS COM CÓDIGO B ────────────────────────────────
+        if (niv <= 4) {
+          // GRUPO (B1, B11, B111, B1111): teal suave + bold
+          // Quanto mais curto o código, ligeiramente mais escuro
+          var tons = { 1:'#BFE0DC', 2:'#C8E5E1', 3:'#D3EBEA', 4:'#DCEEED' };
+          bg  = tons[niv] || '#DCEEED';
+          fc  = '#103D39'; fw = 'bold';
+          cor = corC; codCol = '#5A9490';
+        } else {
+          // DETALHE (niv 5+): zebra branco / verde muito claro
+          bg     = zebra % 2 === 0 ? '#FFFFFF' : '#EFF9F7';
+          fc     = '#222222'; fw = 'normal'; cor = corC; zebra++;
+        }
 
       } else {
-        bg = zebra % 2 === 0 ? '#FFFFFF' : '#EAF4F0';
-        fc = '#222222'; zebra++;
-        cor = corNormal;
+        // ── LINHAS SEM CÓDIGO (Fluxo de Caixa, subitens) ──────
+        bg   = zebra % 2 === 0 ? '#FFFFFF' : '#EDF8F5';
+        fc   = '#222222'; fw = 'normal'; cor = corC; zebra++;
+        // Sublinhas ( - ) / ( + ): leve recuo visual
+        if (/^\( [-+] \)/.test(dsc)) indent = 'padding-left:16px';
       }
 
-      var codColor = (isRes || isSep) ? 'rgba(255,255,255,0.3)' : '#AAAAAA';
-
-      h += '<tr style="background:' + bg + ';color:' + fc + ' !important;font-weight:' + fw + ';font-size:' + fs + '">' +
-        '<td style="font-size:10px;color:' + codColor + '">' + cod + '</td>' +
-        '<td style="' + indent + ';color:' + fc + ' !important">' + dsc + '</td>' +
-        '<td class="r" style="color:' + fc + ' !important">' + fNum(it.v1) + '</td>' +
-        '<td class="r" style="color:' + fc + ' !important">' + fNum(it.v2) + '</td>' +
+      h += '<tr style="background:' + bg + ';font-size:' + fs + ';font-weight:' + fw + '">' +
+        '<td style="font-size:10px;color:' + codCol + ';font-weight:normal">' + cod + '</td>' +
+        '<td style="color:' + fc + ';' + indent + '">' + dsc + '</td>' +
+        '<td class="r" style="color:' + fc + '">' + fNum(it.v1) + '</td>' +
+        '<td class="r" style="color:' + fc + '">' + fNum(it.v2) + '</td>' +
         '<td class="r" style="color:' + cor + ';font-weight:700">' + (neu ? '—' : (it.vr > 0 ? '+' : '') + fNum(it.vr)) + '</td>' +
         '<td class="r" style="color:' + cor + '">' + (neu ? '—' : (it.vp * 100).toFixed(1) + '%') + '</td>' +
         '<td style="text-align:center;color:' + cor + ';font-size:11px;font-weight:700">' + st + '</td></tr>';

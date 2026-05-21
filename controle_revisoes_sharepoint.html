@@ -589,26 +589,16 @@ async function gerarComp() {
     if (corteIdx >= 0) rows = rows.slice(0, corteIdx);
 
     // Injeta linha de % Lucro Líquido após o ( = ) Lucro Líquido
+    // Usa percentRB já salvo nas revisões (mais confiável que calcular das linhas)
     var llIdx = rows.findIndex(function(r) {
-      return (r.desc||'').includes('Lucro L') && (r.desc||'').includes('( = )');
+      var d = (r.desc||'').trim();
+      return d.includes('( = )') && /lucro l/i.test(d) && !d.toLowerCase().includes('s/ oh') && !d.toLowerCase().includes('s/oh');
     });
-    // Também tenta ( = ) Lucro Liquido sem acento
-    if (llIdx < 0) llIdx = rows.findIndex(function(r) {
-      return /^\( = \)\s*Lucro/i.test((r.desc||'').trim());
-    });
-    // Busca a linha % sobre (RB) que pode já existir mas foi cortada
     var pctRbExists = rows.some(function(r) { return /% sobre.*RB/i.test(r.desc||''); });
 
     if (llIdx >= 0 && !pctRbExists) {
-      // Calcula % sobre RB para ambas as revisões
-      // Pega Receita Bruta
-      var rbRow1 = rows.find(function(r) { return /^Receita Bruta/.test((r.desc||'').trim()) && !r.code; });
-      var rb1 = rbRow1 ? rbRow1.v1 : 0;
-      var rb2 = rbRow1 ? rbRow1.v2 : 0;
-      var ll1 = rows[llIdx].v1;
-      var ll2 = rows[llIdx].v2;
-      var pct1 = rb1 ? (ll1 / rb1) * 100 : 0;
-      var pct2 = rb2 ? (ll2 / rb2) * 100 : 0;
+      var pct1 = (revB.percentRB || 0) * (Math.abs(revB.percentRB||0) > 1 ? 1 : 100);
+      var pct2 = (revA.percentRB || 0) * (Math.abs(revA.percentRB||0) > 1 ? 1 : 100);
       var pctR = pct2 - pct1;
       rows.splice(llIdx + 1, 0, {
         code: '',
@@ -617,7 +607,6 @@ async function gerarComp() {
         v2: pct2,
         vr: pctR,
         vp: pct1 ? pctR / Math.abs(pct1) : 0,
-        _isPct: true,
         _pctRow: true
       });
     }
@@ -691,18 +680,20 @@ async function gerarComp() {
 
       // Linha de % injetada
       if (it._pctRow) {
-        var p1 = it.v1 ? it.v1.toFixed(2) + '%' : '—';
-        var p2 = it.v2 ? it.v2.toFixed(2) + '%' : '—';
-        var pv = Math.abs(it.vr) < 0.001 ? '—' : (it.vr > 0 ? '+' : '') + it.vr.toFixed(2) + 'p.p.';
-        var pc = Math.abs(it.vr) < 0.001 ? '#888' : (it.vr > 0 ? '#0A7832' : '#C0392B');
-        h += '<tr style="background:#D9F0E5;font-size:11px;font-weight:normal">' +
-          '<td style="font-size:10px;color:#AAA"></td>' +
-          '<td style="color:#103D39;padding-left:16px;font-style:italic">% sobre (RB)</td>' +
-          '<td class="r" style="color:#103D39">' + p1 + '</td>' +
-          '<td class="r" style="color:#103D39">' + p2 + '</td>' +
-          '<td class="r" style="color:' + pc + ';font-weight:700">' + pv + '</td>' +
-          '<td class="r" style="color:' + pc + '">—</td>' +
-          '<td style="text-align:center;color:' + pc + ';font-size:11px;font-weight:700">' + (Math.abs(it.vr) < 0.001 ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução')) + '</td></tr>';
+        var p1 = it.v1 !== undefined ? it.v1.toFixed(2) + '%' : '—';
+        var p2 = it.v2 !== undefined ? it.v2.toFixed(2) + '%' : '—';
+        var neu2 = Math.abs(it.vr) < 0.001;
+        var pv = neu2 ? '—' : (it.vr > 0 ? '+' : '') + it.vr.toFixed(2) + ' p.p.';
+        var pc = neu2 ? '#888' : (it.vr > 0 ? '#0A7832' : '#C0392B');
+        var bg2 = 'background:#D9F0E5;';
+        h += '<tr style="font-size:11px;font-weight:normal">' +
+          '<td style="' + bg2 + 'font-size:10px;color:#AAA"></td>' +
+          '<td style="' + bg2 + 'color:#103D39;padding-left:16px;font-style:italic">% sobre (RB)</td>' +
+          '<td class="r" style="' + bg2 + 'color:#103D39">' + p1 + '</td>' +
+          '<td class="r" style="' + bg2 + 'color:#103D39">' + p2 + '</td>' +
+          '<td class="r" style="' + bg2 + 'color:' + pc + ';font-weight:700">' + pv + '</td>' +
+          '<td class="r" style="' + bg2 + 'color:' + pc + '">—</td>' +
+          '<td style="' + bg2 + 'text-align:center;color:' + pc + ';font-size:11px;font-weight:700">' + (neu2 ? 'Igual' : (it.vr > 0 ? '(+) Aumento' : '(-) Redução')) + '</td></tr>';
         return;
       }
 
